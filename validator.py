@@ -1,49 +1,47 @@
-
-import re
 import os
 import cv2
+from PIL import Image
 
-class Validator:
-    @staticmethod
-    def is_valid_email(email):
-        """Validates the format of an email address using Regular Expressions (FR 02)."""
-        email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
-        if not email:
-            return False, "Email address cannot be empty."
-        if re.match(email_regex, email):
-            return True, "Valid Email"
-        else:
-            return False, "Invalid Email Format. Please enter a valid email."
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
+MAX_FILE_SIZE_MB = 10
+MIN_RESOLUTION = (224, 224)
+MAX_RESOLUTION = (8192, 8192)
 
-    @staticmethod
-    def validate_image_file(file_path):
-        """
-        Validates image format, file size, and resolution.
-        Covers: FR 17 (Format), FR 18 (Size), FR 19 (Resolution), 
-                FR 20 (Quality), FR 48 (Unsupported Format), FR 49 (Size Exceeded).
-        """
-        # 48 - Handle Unsupported File Format Error & 17 - Check Image File Format
-        valid_extensions = ['.png', '.jpg', '.jpeg', '.bmp']
-        ext = os.path.splitext(file_path)[1].lower()
-        if ext not in valid_extensions:
-            return False, f"Unsupported Format Error: '{ext}' is not supported. Please use JPG or PNG."
+def validate_image_file(file_path):
+    if not os.path.exists(file_path):
+        return False, "File does not exist."
+    
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        return False, f"Unsupported format '{ext}'."
+    
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    if file_size_mb > MAX_FILE_SIZE_MB:
+        return False, "File size exceeds limit."
+    
+    # Check Blur
+    try:
+        cv_img = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+        if cv_img is not None:
+            laplacian_var = cv2.Laplacian(cv_img, cv2.CV_64F).var()
+            # ෆෝන් එක අතේ තබාගෙන සිටින විට සුළු හෙලවීම් වලට ඉඩ දීමට අගය 15.0 ට අඩු කර ඇත.
+            if laplacian_var < 15.0:  
+                print(f"❌ REJECTED {file_path}: Image is Blurry (Score: {laplacian_var:.1f})")
+                return False, "Image is too blurry."
+    except Exception:
+        pass
 
-        # 18 & 49 - Check Image File Size & Handle Size Exceeded Error (Max 10MB)
-        try:
-            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
-            if file_size_mb > 10:
-                return False, f"File Size Exceeded Error: Size ({file_size_mb:.1f} MB) exceeds the 10 MB limit."
-        except Exception as e:
-            return False, f"Error reading file size: {str(e)}"
-
-        # 19 & 20 - Check Image Resolution and Quality
-        img = cv2.imread(file_path)
-        if img is None:
-            return False, "Invalid Image: File is corrupted or unreadable."
-
-        h, w, _ = img.shape
-        if h < 200 or w < 200:
-            return False, f"Quality Warning: Resolution ({w}x{h}) is too low. Minimum required is 200x200."
-
-        # 21 - Mark Image as Valid
-        return True, "Image is Valid"
+    # Check Resolution
+    try:
+        with Image.open(file_path) as img:
+            width, height = img.size
+            if width < MIN_RESOLUTION[0] or height < MIN_RESOLUTION[1]:
+                print(f"❌ REJECTED {file_path}: Resolution too low ({width}x{height}). Needs 224x224.")
+                return False, "Resolution too low."
+            if width > MAX_RESOLUTION[0] or height > MAX_RESOLUTION[1]:
+                return False, "Resolution too high."
+    except Exception as e:
+        return False, "Invalid image data."
+        
+    print(f"✅ PASSED {file_path}: Valid Fabric Image.")
+    return True, "Image validation passed."

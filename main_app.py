@@ -3,16 +3,15 @@ import sys
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                             QHBoxLayout, QPushButton, QStackedWidget, QLabel, QMessageBox)
+                             QHBoxLayout, QPushButton, QStackedWidget, QMessageBox)
 from PyQt6.QtCore import Qt
 
-# Import Views directly from root folder
 from login import LoginPage
 from signup import SignupPage
 from dashboard import DashboardPage
 from upload_page import UploadPage
-
-# Import Database Initializer
+from results_page import ResultsPage
+from history_page import HistoryPage
 from database import initialize_database
 
 class FivoraMainApp(QMainWindow):
@@ -21,10 +20,7 @@ class FivoraMainApp(QMainWindow):
         self.setWindowTitle("FIVORA - Industrial Fabric Inspection System")
         self.resize(1200, 800)
 
-        # Global Session State (FR 09, FR 10)
         self.is_logged_in = False
-        
-        # UI Theme State (True = Dark Mode, False = Light Mode)
         self.is_dark_mode = True  
 
         self.main_widget = QWidget()
@@ -32,64 +28,70 @@ class FivoraMainApp(QMainWindow):
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
 
-        # --- Top Navigation Bar ---
         self.nav_bar = QWidget()
         self.nav_layout = QHBoxLayout(self.nav_bar)
         self.nav_layout.setContentsMargins(15, 8, 15, 8)
 
-        # Theme Toggle Button
+        # Dark mode එකේදී Light mode එකට මාරු වීමට "ඉර" (Sun) අයිකන් එක පෙන්වීම
         self.btn_theme = QPushButton("☀")
         self.btn_theme.setFixedSize(35, 35)
         self.btn_theme.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_theme.clicked.connect(self.toggle_theme)
         self.nav_layout.addWidget(self.btn_theme)
 
-        # Navigation Buttons
-        self.btn_login = QPushButton("Login")
-        self.btn_signup = QPushButton("Signup")
+        self.btn_signin = QPushButton("Sign In")
+        self.btn_signup = QPushButton("Sign Up")
         self.btn_dashboard = QPushButton("Dashboard")
-        self.btn_upload = QPushButton("Upload Image")
+        self.btn_upload = QPushButton("Upload / Capture")
         self.btn_results = QPushButton("Results")
-        self.btn_report = QPushButton("Report")
+        self.btn_report = QPushButton("Reports")
+        
+        self.btn_logout = QPushButton("Logout")
+        self.btn_logout.setStyleSheet("color: #ef4444; font-weight: bold;")
 
-        self.nav_buttons = [self.btn_login, self.btn_signup, self.btn_dashboard, 
-                            self.btn_upload, self.btn_results, self.btn_report]
+        self.nav_buttons = [
+            (self.btn_signin, 0), 
+            (self.btn_signup, 1), 
+            (self.btn_dashboard, 2), 
+            (self.btn_upload, 3), 
+            (self.btn_results, 4),
+            (self.btn_report, 5)
+        ]
 
-        for idx, btn in enumerate(self.nav_buttons):
+        for btn, idx in self.nav_buttons:
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda _, i=idx: self.switch_page(i))
             self.nav_layout.addWidget(btn)
 
+        self.btn_logout.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_logout.clicked.connect(lambda: self.set_login_state(False))
+        
         self.nav_layout.addStretch()
+        self.nav_layout.addWidget(self.btn_logout)
         self.main_layout.addWidget(self.nav_bar)
 
-        # --- Pages Stack (Router) ---
         self.pages = QStackedWidget()
-        self.pages.addWidget(LoginPage(self))      # Index 0
-        self.pages.addWidget(SignupPage(self))     # Index 1
-        self.pages.addWidget(DashboardPage(self))  # Index 2
-        self.pages.addWidget(UploadPage(self))     # Index 3
+        self.pages.addWidget(LoginPage(self))       
+        self.pages.addWidget(SignupPage(self))      
+        self.pages.addWidget(DashboardPage(self))   
+        self.pages.addWidget(UploadPage(self))      
+        self.pages.addWidget(ResultsPage(self))     
+        self.pages.addWidget(HistoryPage(self))     
 
         self.main_layout.addWidget(self.pages)
         self.setCentralWidget(self.main_widget)
 
-        # Initialize Default State
         self.apply_global_theme()
-        self.switch_page(2) # Default landing page
+        
+        self.set_login_state(False)
+        self.switch_page(2) 
 
     def toggle_theme(self):
-        """Toggles between Dark and Light UI themes."""
         self.is_dark_mode = not self.is_dark_mode
         self.btn_theme.setText("☀" if self.is_dark_mode else "🌙")
         self.apply_global_theme()
 
-        # Update Theme in child views if supported
-        dashboard_page = self.pages.widget(2)
-        if hasattr(dashboard_page, 'apply_theme'):
-            dashboard_page.apply_theme(self.is_dark_mode)
-
     def apply_global_theme(self):
-        """Applies styles based on current theme state."""
         if self.is_dark_mode:
             self.setStyleSheet("QMainWindow { background-color: #0b0f19; }")
             self.nav_bar.setStyleSheet("background-color: #161b22; border-bottom: 1px solid #30363d;")
@@ -100,53 +102,58 @@ class FivoraMainApp(QMainWindow):
             self.btn_theme.setStyleSheet("background-color: transparent; border: 1px solid #dee2e6; color: #495057; border-radius: 4px;")
         
         self.update_nav_styles(self.pages.currentIndex())
+        
+        for i in range(self.pages.count()):
+            page = self.pages.widget(i)
+            if hasattr(page, 'apply_theme'):
+                page.apply_theme(self.is_dark_mode)
 
     def switch_page(self, index):
-        """Handles page routing and authentication checks."""
-        # Restrict access to authenticated features
         if index in [3, 4, 5] and not self.is_logged_in:
             QMessageBox.warning(self, "Access Denied", "Please Sign In to access this feature!")
-            self.switch_page(0) # Redirect to Login
+            self.switch_page(0)
             return
+
+        if index == 0 and hasattr(self.pages.widget(0), 'clear_fields'):
+            self.pages.widget(0).clear_fields()
+        elif index == 1 and hasattr(self.pages.widget(1), 'clear_fields'):
+            self.pages.widget(1).clear_fields()
 
         self.pages.setCurrentIndex(index if index < self.pages.count() else 2)
         self.update_nav_styles(index)
+        
+        if index == 4:
+            self.pages.widget(4).refresh_results()
+        elif index == 5:
+            self.pages.widget(5).refresh_data()
 
     def update_nav_styles(self, active_index):
-        """Updates navigation button styles based on active page and theme."""
+        active_style = "background-color: #00A3FF; color: white; font-weight: bold; border-radius: 4px; padding: 8px 16px; border: none;"
         if self.is_dark_mode:
-            active_style = "background-color: #00A3FF; color: white; font-weight: bold; border-radius: 4px; padding: 8px 16px; border: none;"
             normal_style = "background-color: transparent; border: none; padding: 8px 16px; font-weight: bold; color: #8b949e;"
-            disabled_style = "background-color: transparent; border: none; padding: 8px 16px; font-weight: bold; color: #484f58;"
         else:
-            active_style = "background-color: #00A3FF; color: white; font-weight: bold; border-radius: 4px; padding: 8px 16px; border: none;"
             normal_style = "background-color: transparent; border: none; padding: 8px 16px; font-weight: bold; color: #495057;"
-            disabled_style = "background-color: transparent; border: none; padding: 8px 16px; font-weight: bold; color: #adb5bd;"
 
-        for idx, btn in enumerate(self.nav_buttons):
-            if idx in [3, 4, 5] and not self.is_logged_in:
-                btn.setStyleSheet(disabled_style)
-            elif idx == active_index:
+        for btn, idx in self.nav_buttons:
+            if idx == active_index:
                 btn.setStyleSheet(active_style)
             else:
                 btn.setStyleSheet(normal_style)
 
     def set_login_state(self, state: bool):
-        """
-        FR 09: Create User Session on Success
-        FR 10: Terminate Session on Logout
-        """
         self.is_logged_in = state
-        self.btn_login.setText("Logout" if state else "Login")
-        # Route based on login status
-        self.switch_page(2 if state else 0) 
+        if state:
+            self.btn_signin.hide()
+            self.btn_signup.hide()
+            self.btn_logout.show()
+        else:
+            self.btn_signin.show()
+            self.btn_signup.show()
+            self.btn_logout.hide()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    # Initialize the MySQL database and tables on startup
     initialize_database()
-    
     window = FivoraMainApp()
     window.show()
     sys.exit(app.exec())
