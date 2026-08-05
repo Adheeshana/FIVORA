@@ -32,7 +32,6 @@ class FivoraMainApp(QMainWindow):
         self.nav_layout = QHBoxLayout(self.nav_bar)
         self.nav_layout.setContentsMargins(15, 8, 15, 8)
 
-        # Dark mode එකේදී Light mode එකට මාරු වීමට "ඉර" (Sun) අයිකන් එක පෙන්වීම
         self.btn_theme = QPushButton("☀")
         self.btn_theme.setFixedSize(35, 35)
         self.btn_theme.setCursor(Qt.CursorShape.PointingHandCursor)

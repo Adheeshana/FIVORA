@@ -35,7 +35,6 @@ class HistoryPage(QWidget):
         self.table.setColumnCount(7) 
         self.table.setHorizontalHeaderLabels(["Batch ID", "Image Name", "Fabric Type", "Confidence", "Overridden", "Action", "Timestamp"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        # මේකෙන් table එකට ඉඩ අරගෙන ඉතිරි ටික යට බටන්ස් වලට දෙනවා
         main_layout.addWidget(self.table, 1) 
         
         # --- Bottom Buttons (Always Visible) ---

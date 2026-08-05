@@ -24,7 +24,6 @@ def validate_image_file(file_path):
         cv_img = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
         if cv_img is not None:
             laplacian_var = cv2.Laplacian(cv_img, cv2.CV_64F).var()
-            # ෆෝන් එක අතේ තබාගෙන සිටින විට සුළු හෙලවීම් වලට ඉඩ දීමට අගය 15.0 ට අඩු කර ඇත.
             if laplacian_var < 15.0:  
                 print(f"❌ REJECTED {file_path}: Image is Blurry (Score: {laplacian_var:.1f})")
                 return False, "Image is too blurry."
