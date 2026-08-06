@@ -1,3 +1,4 @@
+import re
 import bcrypt
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QLineEdit, QPushButton, QFrame, QMessageBox, QCheckBox)
@@ -124,18 +125,33 @@ class SignupPage(QWidget):
         pwd = self.password.text().strip()
         cpwd = self.confirm_password.text().strip()
 
+        # 1. Check if all fields are filled
         if not all([fname, lname, email, pwd, cpwd]):
             QMessageBox.warning(self, "Error", "All fields are required!")
             return
 
+        # 2. Email Validation (Regex)
+        email_pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+        if not re.match(email_pattern, email):
+            QMessageBox.warning(self, "Invalid Email", "Please enter a valid email address! \n(e.g., inspector@fivora.com)")
+            return
+
+        # 3. Password Length Validation
+        if len(pwd) < 8:
+            QMessageBox.warning(self, "Weak Password", "Password must be at least 8 characters long!")
+            return
+
+        # 4. Check if passwords match
         if pwd != cpwd:
             QMessageBox.warning(self, "Error", "Passwords do not match!")
             return
 
+        # 5. Check if terms are accepted
         if not self.terms_checkbox.isChecked():
             QMessageBox.warning(self, "Error", "Please agree to the Terms & Privacy Policy.")
             return
 
+        # Hash the password and save to database
         hashed_pwd = bcrypt.hashpw(pwd.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         success, msg = register_user(fname, lname, email, hashed_pwd)
 
