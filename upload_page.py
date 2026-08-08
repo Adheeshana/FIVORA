@@ -18,6 +18,12 @@ class CaptureThread(QThread):
 
     def run(self):
         cap = cv2.VideoCapture(self.camera_source)
+        
+        if not cap.isOpened():
+            self.progress.emit("ERROR: Camera permission denied or unavailable.")
+            self.finished_capture.emit([]) 
+            return
+
         captured_files = []
         start_time = time.time()
         self.progress.emit("Connecting to Camera & Starting 1-minute capture...")
@@ -128,9 +134,40 @@ class UploadPage(QWidget):
             self.btn_capture_icon.setStyleSheet("QPushButton { background-color: #e0f2fe; color: #0ea5e9; border-radius: 32px; font-size: 24px; border: none; }")
 
     def browse_multiple_files(self):
-        file_paths, _ = QFileDialog.getOpenFileNames(self, "Select Fabric Images", "", "Images (*.png *.jpg *.jpeg *.bmp)")
-        if file_paths:
-            self.process_selected_files(file_paths)
+        # Allow checking all files so we can test the extension block
+        file_paths, _ = QFileDialog.getOpenFileNames(self, "Select Fabric Images", "", "All Files (*.*)")
+        if not file_paths:
+            return
+
+        valid_extensions = {".jpg", ".jpeg", ".png"}
+        max_size_bytes = 5 * 1024 * 1024 # 5 MB
+
+        valid_paths_to_process = []
+        
+        for fp in file_paths:
+            ext = os.path.splitext(fp)[1].lower()
+
+            # --- FR 48: Handle Unsupported File Format Error ---
+            if ext not in valid_extensions:
+                QMessageBox.critical(self, "Unsupported Format Error", f"File '{os.path.basename(fp)}' is not supported!\nOnly JPG, JPEG, and PNG formats are allowed.")
+                self.status_label.setText("")
+                return 
+
+            # --- FR 49: Handle File Size Exceeded Error ---
+            try:
+                file_size = os.path.getsize(fp)
+                if file_size > max_size_bytes:
+                    QMessageBox.critical(self, "File Size Exceeded", f"File '{os.path.basename(fp)}' is too large ({file_size/1024/1024:.2f} MB)!\nMaximum allowed size is 5MB to prevent memory overload.")
+                    self.status_label.setText("")
+                    return 
+            except OSError:
+                QMessageBox.critical(self, "Error", f"Could not read file '{os.path.basename(fp)}'.")
+                return
+
+            valid_paths_to_process.append(fp)
+
+        if valid_paths_to_process:
+            self.process_selected_files(valid_paths_to_process)
 
     def start_continuous_capture(self):
         text, ok = QInputDialog.getText(self, "Connect Camera", 
@@ -151,9 +188,12 @@ class UploadPage(QWidget):
     def on_capture_finished(self, captured_files):
         self.btn_capture_icon.setEnabled(True)
         self.btn_upload_icon.setEnabled(True)
+        
         if not captured_files:
-            self.status_label.setText("Capture Failed. Please check the Camera URL/Network.")
+            self.status_label.setText("Camera connection failed.")
+            QMessageBox.critical(self, "Camera Permission Denied", "Camera access denied or camera is unavailable.\nPlease check your OS settings, camera permissions or the network URL.")
             return
+            
         self.status_label.setText("Capture complete! Validating images...")
         self.process_selected_files(captured_files)
 

@@ -2,12 +2,18 @@ import pandas as pd
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import os
+import shutil # FR 52 සඳහා Hard Disk ඉඩ බලන්න Import කළා
 from datetime import datetime
 
 class ReportGenerator:
     @staticmethod
     def export_to_csv(records, filename="fivora_inspection_history.csv"):
         try:
+            # --- FR 52: Handle Storage Limit Exceeded Error ---
+            total, used, free = shutil.disk_usage(os.getcwd())
+            if free < 5 * 1024 * 1024: # Hard Disk එකේ ඉඩ 5MB වලට වඩා අඩු නම්
+                return False, "Storage Limit Exceeded Error: Not enough disk space to save the CSV report!"
+
             df = pd.DataFrame(records, columns=["Batch ID", "Image Name", "Fabric Type", "Confidence (%)", "Is Overridden", "Action Status", "Timestamp"])
             df.to_csv(filename, index=False)
             return True, f"CSV Report exported successfully to:\n{os.path.abspath(filename)}"
@@ -17,6 +23,11 @@ class ReportGenerator:
     @staticmethod
     def export_to_pdf(records, batch_name, filename="fivora_latest_report.pdf"):
         try:
+            # --- FR 52: Handle Storage Limit Exceeded Error ---
+            total, used, free = shutil.disk_usage(os.getcwd())
+            if free < 5 * 1024 * 1024: # Hard Disk එකේ ඉඩ 5MB වලට වඩා අඩු නම්
+                return False, "Storage Limit Exceeded Error: Not enough disk space to save the PDF report!"
+
             c = canvas.Canvas(filename, pagesize=letter)
             width, height = letter
             
@@ -33,10 +44,9 @@ class ReportGenerator:
             c.setFont("Helvetica-Bold", 14)
             c.drawString(50, height - 180, "Batch Summary:")
             
-            # Simple list of first few records if batch is huge
             c.setFont("Helvetica", 10)
             y_pos = height - 210
-            for i, rec in enumerate(records[:30]): # Limits to 30 items for PDF summary
+            for i, rec in enumerate(records[:30]): 
                 text_line = f"Image: {rec[1]} | Type: {rec[2]} | Conf: {rec[3]} | Action: {rec[5]}"
                 c.drawString(60, y_pos, text_line)
                 y_pos -= 20

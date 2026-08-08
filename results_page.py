@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButt
 from PyQt6.QtCore import Qt
 from database import save_inspection_record
 from datetime import datetime
+from report_generator import ReportGenerator # FR 46 සඳහා අලුතින් Import කළා
 
 class ResultsPage(QWidget):
     def __init__(self, parent=None):
@@ -92,8 +93,25 @@ class ResultsPage(QWidget):
                 
         if success_count > 0:
             QMessageBox.information(self, "Success", f"All {success_count} results saved to database!")
-            self.current_batch = [] # Clear memory after saving
+            self.current_batch = [] 
             self.refresh_results()
-            self.parent.switch_page(5) # Switch to Reports
+            self.parent.switch_page(5) 
         else:
-            QMessageBox.critical(self, "Error", "Failed to save data.")
+            # --- FR 46: Allow Local Download if DB Save Fails ---
+            reply = QMessageBox.question(self, "Database Connection Error", 
+                                         "Failed to connect to the database (Check if XAMPP is running).\n\nWould you like to download these results locally as a CSV file to prevent data loss?",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                records = []
+                for item in self.current_batch:
+                    records.append([item['batch_id'], item['filename'], item['type'], item['conf'], "False", "Local Backup (Offline)", datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+                
+                fallback_filename = f"Offline_Backup_{self.current_batch[0]['batch_id']}.csv"
+                export_success, msg = ReportGenerator.export_to_csv(records, filename=fallback_filename)
+                
+                if export_success:
+                    QMessageBox.information(self, "Local Backup Saved", msg)
+                    self.current_batch = []
+                    self.refresh_results()
+                else:
+                    QMessageBox.critical(self, "Backup Failed", msg)
