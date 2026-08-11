@@ -5,7 +5,7 @@ import json
 import os
 import uuid
 import random
-import concurrent.futures # --- FR 51 සඳහා අලුතින් import කළා ---
+import concurrent.futures 
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
                              QFrame, QPushButton, QComboBox, QMessageBox,
                              QGraphicsView, QGraphicsScene)
@@ -13,7 +13,6 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage, QPixmap
 from database import save_inspection_record
 
-# --- FR 40: Zoom / Pan Class ---
 class ZoomPanGraphicsView(QGraphicsView):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -62,7 +61,6 @@ class DashboardPage(QWidget):
         if os.path.exists(model_path):
             self.model = tf.keras.models.load_model(model_path)
 
-        # --- Center Panel ---
         center_panel = QVBoxLayout()
         center_panel.setSpacing(10)
         
@@ -91,7 +89,6 @@ class DashboardPage(QWidget):
         
         self.main_layout.addLayout(center_panel, 3) 
 
-        # --- Right Sidebar ---
         self.sidebar = QFrame()
         self.sidebar.setMinimumWidth(280)
         self.sidebar.setMaximumWidth(350)
@@ -164,9 +161,12 @@ class DashboardPage(QWidget):
     def process_image_batch(self, batch_id, valid_files):
         if not valid_files: return
         self.current_batch_id = batch_id
-        random_preview_file = random.choice(valid_files)
         
         batch_results = []
+        
+        highest_conf = -1.0
+        best_preview_data = None
+        best_qimg = None
         
         for fp in valid_files:
             image = cv2.imread(fp)
@@ -174,7 +174,6 @@ class DashboardPage(QWidget):
                 resized = cv2.resize(image, self.IMG_SIZE)
                 preprocessed = tf.keras.applications.densenet.preprocess_input(cv2.cvtColor(resized, cv2.COLOR_BGR2RGB))
                 
-                # --- FR 51: Handle AI Timeout Error ---
                 try:
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         future = executor.submit(self.model.predict, np.expand_dims(preprocessed, axis=0), verbose=0)
@@ -187,7 +186,6 @@ class DashboardPage(QWidget):
                 except Exception as e:
                     print(f"Prediction Error: {e}")
                     continue
-                # ----------------------------------------------------
                 
                 idx = np.argmax(preds[0])
                 conf = float(np.max(preds[0])) * 100
@@ -201,19 +199,21 @@ class DashboardPage(QWidget):
                     "conf": conf
                 })
                 
-                if fp == random_preview_file:
-                    self.preview_data_cache = {"filename": img_name, "type": ftype, "conf": conf, "overridden_type": None}
+                if conf > highest_conf:
+                    highest_conf = conf
+                    best_preview_data = {"filename": img_name, "type": ftype, "conf": conf, "overridden_type": None}
                     h, w, ch = image.shape
                     rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                    qimg = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
+                    best_qimg = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
                     
-                    self.cam_label.set_image(QPixmap.fromImage(qimg))
-                    
-                    self.type_label.setText(f"TYPE: {ftype.upper()}")
-                    self.conf_val.setText(f"Confidence: {conf:.1f}%")
-                    self.override_combo.blockSignals(True)
-                    self.override_combo.setCurrentIndex(0)
-                    self.override_combo.blockSignals(False)
+        if best_preview_data and best_qimg:
+            self.preview_data_cache = best_preview_data
+            self.cam_label.set_image(QPixmap.fromImage(best_qimg))
+            self.type_label.setText(f"TYPE: {best_preview_data['type'].upper()}")
+            self.conf_val.setText(f"Confidence: {highest_conf:.1f}%")
+            self.override_combo.blockSignals(True)
+            self.override_combo.setCurrentIndex(0)
+            self.override_combo.blockSignals(False)
 
         results_page = self.parent.pages.widget(4)
         if hasattr(results_page, 'load_new_batch'):
