@@ -2,8 +2,8 @@ import os
 import cv2
 from PIL import Image
 
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
-MAX_FILE_SIZE_MB = 10
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"} 
+MAX_FILE_SIZE_MB = 5  
 MIN_RESOLUTION = (224, 224)
 MAX_RESOLUTION = (8192, 8192)
 

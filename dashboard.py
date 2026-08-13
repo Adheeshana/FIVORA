@@ -5,10 +5,37 @@ import json
 import os
 import uuid
 import random
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QFrame, QPushButton, QComboBox, QMessageBox
+import concurrent.futures 
+from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QLabel, 
+                             QFrame, QPushButton, QComboBox, QMessageBox,
+                             QGraphicsView, QGraphicsScene)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage, QPixmap
 from database import save_inspection_record
+
+class ZoomPanGraphicsView(QGraphicsView):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.scene = QGraphicsScene(self)
+        self.setScene(self.scene)
+        self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag) 
+        
+        self.placeholder_text = self.scene.addText("📷 NO FABRIC FEED AVAILABLE")
+        self.placeholder_text.setDefaultTextColor(Qt.GlobalColor.gray)
+
+    def set_image(self, pixmap):
+        self.scene.clear() 
+        self.scene.addPixmap(pixmap) 
+        self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio) 
+
+    def wheelEvent(self, event):
+        zoom_in_factor = 1.25
+        zoom_out_factor = 1 / zoom_in_factor
+        
+        if event.angleDelta().y() > 0:
+            self.scale(zoom_in_factor, zoom_in_factor)
+        else:
+            self.scale(zoom_out_factor, zoom_out_factor)
 
 class DashboardPage(QWidget):
     def __init__(self, parent=None):
@@ -34,7 +61,6 @@ class DashboardPage(QWidget):
         if os.path.exists(model_path):
             self.model = tf.keras.models.load_model(model_path)
 
-        # --- Center Panel ---
         center_panel = QVBoxLayout()
         center_panel.setSpacing(10)
         
@@ -53,18 +79,16 @@ class DashboardPage(QWidget):
         header_layout.addStretch()
         center_panel.addLayout(header_layout)
         
-        self.cam_label = QLabel("📷 NO FABRIC FEED AVAILABLE\n\nClick the camera icon to capture.")
-        self.cam_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.cam_label.setMinimumSize(320, 240) # Allow shrinking
-        center_panel.addWidget(self.cam_label, 1) # Expand ratio
+        self.cam_label = ZoomPanGraphicsView()
+        self.cam_label.setMinimumSize(320, 240)
+        center_panel.addWidget(self.cam_label, 1) 
         
         self.batch_info_label = QLabel("")
         self.batch_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         center_panel.addWidget(self.batch_info_label)
         
-        self.main_layout.addLayout(center_panel, 3) # Left takes 3/4 width
+        self.main_layout.addLayout(center_panel, 3) 
 
-        # --- Right Sidebar ---
         self.sidebar = QFrame()
         self.sidebar.setMinimumWidth(280)
         self.sidebar.setMaximumWidth(350)
@@ -84,7 +108,7 @@ class DashboardPage(QWidget):
         side_lay.addWidget(self.type_label)
         side_lay.addWidget(self.override_combo)
         side_lay.addWidget(self.conf_val)
-        side_lay.addStretch() # Pushes buttons to the absolute bottom of sidebar
+        side_lay.addStretch() 
         
         self.btn_accept = QPushButton("✔ ACCEPT PREVIEW ROLL")
         self.btn_accept.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -99,14 +123,14 @@ class DashboardPage(QWidget):
         side_lay.addWidget(self.btn_accept)
         side_lay.addWidget(self.btn_reject)
         
-        self.main_layout.addWidget(self.sidebar, 1) # Sidebar takes 1/4 width
+        self.main_layout.addWidget(self.sidebar, 1) 
         self.apply_theme(False)
 
     def apply_theme(self, is_dark):
         if is_dark:
             self.setStyleSheet("background-color: #0b0f19; color: white;")
             self.cam_title.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
-            self.cam_label.setStyleSheet("background: #0f172a; border: 2px dashed #334155; border-radius: 12px; color: #94a3b8; font-weight: bold;")
+            self.cam_label.setStyleSheet("background: #0f172a; border: 2px dashed #334155; border-radius: 12px;")
             self.batch_info_label.setStyleSheet("color: #0ea5e9; font-weight: bold; font-size: 14px;")
             self.sidebar.setStyleSheet("background: #111827; border-radius: 12px; border: 1px solid #1e293b;")
             self.type_header.setStyleSheet("color: #64748b; font-size: 11px; font-weight: bold; border: none;")
@@ -116,7 +140,7 @@ class DashboardPage(QWidget):
         else:
             self.setStyleSheet("background-color: #f4f6f9; color: #0f172a;")
             self.cam_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #0f172a;")
-            self.cam_label.setStyleSheet("background: #e2e8f0; border: 2px dashed #cbd5e1; border-radius: 12px; color: #64748b; font-weight: bold;")
+            self.cam_label.setStyleSheet("background: #e2e8f0; border: 2px dashed #cbd5e1; border-radius: 12px;")
             self.batch_info_label.setStyleSheet("color: #0284c7; font-weight: bold; font-size: 14px;")
             self.sidebar.setStyleSheet("background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;")
             self.type_header.setStyleSheet("color: #64748b; font-size: 11px; font-weight: bold; border: none;")
@@ -137,16 +161,31 @@ class DashboardPage(QWidget):
     def process_image_batch(self, batch_id, valid_files):
         if not valid_files: return
         self.current_batch_id = batch_id
-        random_preview_file = random.choice(valid_files)
         
         batch_results = []
+        
+        highest_conf = -1.0
+        best_preview_data = None
+        best_qimg = None
         
         for fp in valid_files:
             image = cv2.imread(fp)
             if image is not None and self.model is not None:
                 resized = cv2.resize(image, self.IMG_SIZE)
                 preprocessed = tf.keras.applications.densenet.preprocess_input(cv2.cvtColor(resized, cv2.COLOR_BGR2RGB))
-                preds = self.model.predict(np.expand_dims(preprocessed, axis=0), verbose=0)
+                
+                try:
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self.model.predict, np.expand_dims(preprocessed, axis=0), verbose=0)
+                        
+                        preds = future.result(timeout=10.0)
+                        
+                except concurrent.futures.TimeoutError:
+                    QMessageBox.warning(self, "AI Timeout Error", f"AI model took too long to process '{os.path.basename(fp)}'.\nTimeout triggered after 10 seconds.")
+                    continue
+                except Exception as e:
+                    print(f"Prediction Error: {e}")
+                    continue
                 
                 idx = np.argmax(preds[0])
                 conf = float(np.max(preds[0])) * 100
@@ -160,25 +199,27 @@ class DashboardPage(QWidget):
                     "conf": conf
                 })
                 
-                if fp == random_preview_file:
-                    self.preview_data_cache = {"filename": img_name, "type": ftype, "conf": conf, "overridden_type": None}
+                if conf > highest_conf:
+                    highest_conf = conf
+                    best_preview_data = {"filename": img_name, "type": ftype, "conf": conf, "overridden_type": None}
                     h, w, ch = image.shape
                     rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                    qimg = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
-                    self.cam_label.setPixmap(QPixmap.fromImage(qimg).scaled(self.cam_label.width(), self.cam_label.height(), Qt.AspectRatioMode.KeepAspectRatio))
-                    self.type_label.setText(f"TYPE: {ftype.upper()}")
-                    self.conf_val.setText(f"Confidence: {conf:.1f}%")
-                    self.override_combo.blockSignals(True)
-                    self.override_combo.setCurrentIndex(0)
-                    self.override_combo.blockSignals(False)
+                    best_qimg = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888).copy()
+                    
+        if best_preview_data and best_qimg:
+            self.preview_data_cache = best_preview_data
+            self.cam_label.set_image(QPixmap.fromImage(best_qimg))
+            self.type_label.setText(f"TYPE: {best_preview_data['type'].upper()}")
+            self.conf_val.setText(f"Confidence: {highest_conf:.1f}%")
+            self.override_combo.blockSignals(True)
+            self.override_combo.setCurrentIndex(0)
+            self.override_combo.blockSignals(False)
 
         results_page = self.parent.pages.widget(4)
         if hasattr(results_page, 'load_new_batch'):
             results_page.load_new_batch(batch_results)
 
         self.batch_info_label.setText(f"Batch {batch_id} Analyzed. Please check 'Results' tab to save.")
-
-    
 
     def save_preview_action(self, status):
         if not self.preview_data_cache or not self.current_batch_id:
