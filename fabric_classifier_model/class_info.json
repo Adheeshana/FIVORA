@@ -1,0 +1,18 @@
+{
+  "classes": [
+    "Chiffon",
+    "Cotton",
+    "Denim",
+    "Linen",
+    "Polyester",
+    "Silk",
+    "Velvet",
+    "Viscose",
+    "Wool"
+  ],
+  "input_size": [
+    224,
+    224
+  ],
+  "preprocessing": "densenet"
+}

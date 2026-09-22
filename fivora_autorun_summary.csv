@@ -1,0 +1,23 @@
+﻿==========================================================================================================
+FIVORA INDUSTRIAL FABRIC QUALITY CONTROL & TRACEABILITY AUDIT REPORT,,,,,,,,,,,,
+==========================================================================================================
+Report Title,Workstation Fabric Inspection Audit Report,Generated Timestamp,2026-09-06 21:38:56,Vision System,FIVORA AI v2.0,,,,,,,
+Batch / Filter Scope,All Batches,Total Samples Inspected,2,Batch Pass Rate,0.0%,,,,,,,
+Total Accepted (Pass),0,Total Rejected (Defective),2,Compliance State,REVIEW REQUIRED,,,,,,,
+
+----------------------------------------------------------------------------------------------------------
+DETAILED FABRIC INSPECTION DATA TABLE,,,,,,,,,,,,
+----------------------------------------------------------------------------------------------------------
+Record #,Timestamp,Batch ID,Roll ID,Image Filename,Fabric Type,Confidence Score (%),Defect Status,Defect Category,Defect Count,Inspection Decision,Decision Source,QC Operator
+1,2026-09-06 21:38:46,BATCH_AUTORUN,ROLL-BATCH_AUTORUN,sample_cotton_clean.jpg,Linen,91.9%,PASS,None,0,Passed,AI Model,QC_INSPECTOR_01
+2,2026-09-06 21:38:55,BATCH_AUTORUN,ROLL-BATCH_AUTORUN,sample_denim_stained.jpg,Linen,80.1%,PASS,None,0,Flagged Defect,AI Model,QC_INSPECTOR_01
+
+----------------------------------------------------------------------------------------------------------
+AUDIT SUMMARY TOTALS,,,,,,,,,,,,
+----------------------------------------------------------------------------------------------------------
+Total Records Evaluated,2,,,,,,,,,,,
+Total Samples Passed,0,,,,,,,,,,,
+Total Samples Rejected,2,,,,,,,,,,,
+Overall Acceptance Rate,0.0%,,,,,,,,,,,
+Traceability Log Status,OFFICIALLY VERIFIED & SAVED,,,,,,,,,,,
+==========================================================================================================

@@ -1,0 +1,93 @@
+{
+  "inspector@fivora.com": {
+    "id": 1,
+    "fname": "Default",
+    "lname": "Inspector",
+    "email": "inspector@fivora.com",
+    "password_hash": "$2b$12$Cw3XcyW2YW8j9xzGlXy.lOiIiF6py2d388Fh3NcdEKM01HT/.Ns5K",
+    "status": "Active"
+  },
+  "auto_inspector@fivora.com": {
+    "id": 2,
+    "fname": "Auto",
+    "lname": "Inspector",
+    "email": "auto_inspector@fivora.com",
+    "password_hash": "$2b$12$PntSPgH/tyWFDCGBBTl/l.FdZCX3paooKCqNFJSJHt3YbfTRi6lEO",
+    "status": "Active"
+  },
+  "aa@gmail.com": {
+    "id": 3,
+    "fname": "aa",
+    "lname": "a",
+    "email": "aa@gmail.com",
+    "password_hash": "$2b$12$KssJAS6pxcZbm90IgBvygONk4nzyA9RQ3301cEJNvrhR.2fnZDfTy",
+    "status": "Active"
+  },
+  "a@gmail.com": {
+    "id": 4,
+    "fname": "q",
+    "lname": "q",
+    "email": "a@gmail.com",
+    "password_hash": "$2b$12$3SIGLpfXn96Vir2OZuopiOD6dONxpfg4bH08lp5HMFEJ9.oS1XQYG",
+    "status": "Active"
+  },
+  "h@gmi.com": {
+    "id": 5,
+    "fname": "12",
+    "lname": "2",
+    "email": "h@gmi.com",
+    "password_hash": "$2b$12$5ywCr0BsGvP7ORbq/6w2gObZZq1GAf31cBbQVxlB076lsBKv2Jkrm",
+    "status": "Active"
+  },
+  "lkm@gmail.com": {
+    "id": 6,
+    "fname": "l",
+    "lname": "mkl",
+    "email": "lkm@gmail.com",
+    "password_hash": "$2b$12$ewNdKPji1Pt1G846pNVZtukpCby9ltX/rbxQWTKyHYLHiWjnm67za",
+    "role": "Operator",
+    "status": "Active"
+  },
+  "ad@gmail.com": {
+    "id": 7,
+    "fname": "wdfw",
+    "lname": "wd",
+    "email": "ad@gmail.com",
+    "password_hash": "$2b$12$ENZSYjdpLQIZvSF8ZtK/kOmapYWA835cgRsa1WZF/9nFF10ZHKJgS",
+    "role": "Operator",
+    "status": "Active"
+  },
+  "s2@gmail.com": {
+    "id": 8,
+    "fname": "w",
+    "lname": "s",
+    "email": "s2@gmail.com",
+    "password_hash": "$2b$12$ikHaSqU2CMh02KADJlMUNez5DHaPhDvJn/ABvedMYBTXiu8GaPx3i",
+    "role": "Operator",
+    "status": "Active"
+  },
+  "admin@gmail.com": {
+    "id": 0,
+    "fname": "System",
+    "lname": "Administrator",
+    "email": "admin@gmail.com",
+    "password_hash": "$2b$12$7RdFs4zv75ey5d7KTO5Kte8lFi1Uevd024a4EAHlfrxH3oJuspF7y",
+    "role": "Admin",
+    "status": "Active",
+    "activity_logs": [
+      {
+        "login_timestamp": "2026-09-22 19:56:47",
+        "logout_timestamp": null
+      }
+    ]
+  },
+  "q@gmail.com": {
+    "id": 10,
+    "fname": "a",
+    "lname": "a",
+    "email": "q@gmail.com",
+    "password_hash": "$2b$12$N20BN2hnf9iTtmooDjW4I.3fAtWWxIc6.AyPY2DjnnEZxEVSQjfra",
+    "role": "Operator",
+    "status": "Pending"
+  }
+}

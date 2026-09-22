@@ -1,0 +1,2 @@
+Timestamp,Image_Filename,Fabric_Type,Confidence_Score (%),Inspection_Status,Decision_Source
+2026-08-13 19:44:12,BATCH_20260813_194259_img_1.jpeg,Nylon,78.3%,Accepted,AI Model
