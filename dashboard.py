@@ -23,9 +23,25 @@ from database import save_inspection_record
 from custom_dialog import show_message_dialog
 
 
-# ============================================================
-# ZOOM / PAN GRAPHICS VIEW WITH BOUNDING OVERLAY CANVAS
-# ============================================================
+class AIWorker(QThread):
+    result_ready = pyqtSignal(dict, dict, str)
+
+    def __init__(self, classifier, defect_detector, frame, img_path=None):
+        super().__init__()
+        self.classifier = classifier
+        self.defect_detector = defect_detector
+        self.frame = frame.copy()
+        self.img_path = img_path
+
+    def run(self):
+        defect_res = self.defect_detector.detect(self.frame)
+        if not self.img_path:
+            temp_path = "temp_live_frame.jpg"
+            cv2.imwrite(temp_path, self.frame)
+            self.img_path = temp_path
+        class_res = self.classifier.predict_detailed(self.img_path)
+        self.result_ready.emit(class_res, defect_res, self.img_path)
+
 
 class MachineVisionCanvas(QGraphicsView):
     def __init__(self, parent=None):
@@ -33,13 +49,13 @@ class MachineVisionCanvas(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        self.setStyleSheet("background-color: #0b0f19; border-radius: 8px; border: 1px solid #1e293b;")
 
         self.placeholder_text = self.scene.addText(
             "CAMERA / IMAGE PREVIEW\n\n"
-            "No camera or image feed available.\n"
             "Start the camera or upload an image to begin inspection."
         )
-        self.placeholder_text.setDefaultTextColor(QColor("#64748b"))
+        self.placeholder_text.setDefaultTextColor(QColor("#475569"))
         font = QFont("Helvetica", 14, QFont.Weight.Bold)
         self.placeholder_text.setFont(font)
 
@@ -49,8 +65,7 @@ class MachineVisionCanvas(QGraphicsView):
         self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def fit_to_view(self):
-        if not self.scene.items():
-            return
+        if not self.scene.items(): return
         self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
 
     def wheelEvent(self, event):
@@ -62,18 +77,14 @@ class MachineVisionCanvas(QGraphicsView):
             self.scale(zoom_out_factor, zoom_out_factor)
 
 
-# ============================================================
-# MAIN DASHBOARD / WORKSTATION PAGE
-# ============================================================
-
 class DashboardPage(QWidget):
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
 
-        # Instantiate Machine Vision & AI Engines
         self.classifier = FabricClassifier()
         self.defect_detector = FabricDefectDetector()
+        self.ai_worker = None
 
         self.current_frame = None
         self.current_defects = []
@@ -87,32 +98,25 @@ class DashboardPage(QWidget):
         self.is_camera_connected = False
         self.camera_cap = None
 
-        # Build Workstation Layout
         main_vbox = QVBoxLayout(self)
         main_vbox.setContentsMargins(15, 15, 15, 15)
         main_vbox.setSpacing(12)
 
-        # 1. TOP SYSTEM STATUS BAR
         self.create_top_status_bar(main_vbox)
-
-        # 2. SOURCE CONTROLLER BAR
         self.create_source_controller_bar(main_vbox)
 
-        # 3. CENTRAL SPLITTER (Machine Vision Canvas + AI Sidebar)
         content_splitter = QSplitter(Qt.Orientation.Horizontal)
+        content_splitter.setStyleSheet("QSplitter::handle { background-color: transparent; }")
 
-        # Left Panel (Canvas & Toolbars)
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(8)
 
-        # Machine Vision Canvas
         self.canvas = MachineVisionCanvas()
         self.canvas.setMinimumSize(480, 360)
         left_layout.addWidget(self.canvas, 1)
 
-        # Canvas Controls Toolbar
         toolbar_layout = QHBoxLayout()
         self.btn_fit = QPushButton("🔍 Fit View")
         self.btn_zoom_in = QPushButton("➕ Zoom In")
@@ -133,60 +137,33 @@ class DashboardPage(QWidget):
 
         toolbar_layout.addStretch()
         left_layout.addLayout(toolbar_layout)
-
         content_splitter.addWidget(left_panel)
 
-        # Right Panel (QC Sidebar)
         self.create_right_qc_sidebar(content_splitter)
 
         content_splitter.setStretchFactor(0, 3)
         content_splitter.setStretchFactor(1, 1)
         main_vbox.addWidget(content_splitter, 1)
 
-        # Frame Processing Timer
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_camera_feed)
-
         self.apply_theme(True)
 
-    # ------------------------------------------------------------
-    # TOP STATUS BAR  (AI MODELS badge removed as requested)
-    # ------------------------------------------------------------
     def create_top_status_bar(self, parent_layout):
         self.status_frame = QFrame()
         self.status_frame.setFixedHeight(44)
         lay = QHBoxLayout(self.status_frame)
         lay.setContentsMargins(15, 0, 15, 0)
 
-        title = QLabel("FIVORA  |  QC WORKSTATION")
-        title.setStyleSheet("font-size: 14px; font-weight: bold; color: #0ea5e9; letter-spacing: 1px;")
-
-        self.led_sys = QLabel("🟢 SYSTEM READY")
-        self.led_cam = QLabel("🔴 CAMERA OFFLINE")
-
-        for led in [self.led_sys, self.led_cam]:
-            led.setStyleSheet("font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 4px; background-color: #1e293b; color: #f8fafc;")
-
+        # අනවශ්‍ය විස්තර ඉවත් කර Batch ID එක පමණක් තබා ඇත
         self.lbl_batch_tag = QLabel(f"BATCH: {self.current_batch_id}")
-        self.lbl_batch_tag.setStyleSheet("font-size: 12px; font-weight: bold; color: #38bdf8;")
+        self.lbl_batch_tag.setStyleSheet("font-size: 12px; font-weight: bold; color: #94a3b8; background: #1e293b; padding: 6px 12px; border-radius: 4px; border: 1px solid #334155;")
 
-        self.lbl_operator_tag = QLabel("OPERATOR: QC_INSPECTOR_01")
-        self.lbl_operator_tag.setStyleSheet("font-size: 11px; color: #94a3b8;")
-
-        lay.addWidget(title)
-        lay.addSpacing(20)
-        lay.addWidget(self.led_sys)
-        lay.addWidget(self.led_cam)
         lay.addStretch()
         lay.addWidget(self.lbl_batch_tag)
-        lay.addSpacing(15)
-        lay.addWidget(self.lbl_operator_tag)
 
         parent_layout.addWidget(self.status_frame)
 
-    # ------------------------------------------------------------
-    # SOURCE CONTROLLER BAR 
-    # ------------------------------------------------------------
     def create_source_controller_bar(self, parent_layout):
         self.ctrl_frame = QFrame()
         self.ctrl_frame.setFixedHeight(56)
@@ -211,21 +188,20 @@ class DashboardPage(QWidget):
 
         self.btn_camera.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_capture.setCursor(Qt.CursorShape.PointingHandCursor)
-
         self.btn_camera.setMinimumHeight(36)
         self.btn_capture.setMinimumHeight(36)
         self.btn_camera.setMinimumWidth(150)
         self.btn_capture.setMinimumWidth(180)
 
         self.btn_camera.setStyleSheet(
-            "QPushButton { background-color: #0ea5e9; color: white; font-weight: bold; "
-            "padding: 6px 16px; border-radius: 6px; border: none; font-size: 12px; } "
-            "QPushButton:hover { background-color: #0284c7; }"
+            "QPushButton { background-color: #334155; color: white; font-weight: bold; "
+            "padding: 6px 16px; border-radius: 4px; border: none; font-size: 12px; } "
+            "QPushButton:hover { background-color: #475569; }"
         )
         self.btn_capture.setStyleSheet(
-            "QPushButton { background-color: #10b981; color: white; font-weight: bold; "
-            "padding: 6px 16px; border-radius: 6px; border: none; font-size: 12px; } "
-            "QPushButton:hover { background-color: #059669; }"
+            "QPushButton { background-color: #0284c7; color: white; font-weight: bold; "
+            "padding: 6px 16px; border-radius: 4px; border: none; font-size: 12px; } "
+            "QPushButton:hover { background-color: #0369a1; }"
         )
 
         self.btn_camera.clicked.connect(self.toggle_camera)
@@ -239,9 +215,6 @@ class DashboardPage(QWidget):
 
         parent_layout.addWidget(self.ctrl_frame)
 
-    # ------------------------------------------------------------
-    # RIGHT QC SIDEBAR
-    # ------------------------------------------------------------
     def create_right_qc_sidebar(self, parent_splitter):
         self.sidebar = QFrame()
         self.sidebar.setMinimumWidth(330)
@@ -250,23 +223,23 @@ class DashboardPage(QWidget):
         side_lay.setContentsMargins(16, 16, 16, 16)
         side_lay.setSpacing(14)
 
-        box_class = QGroupBox("SECTION A — FABRIC CLASSIFICATION")
+        box_class = QGroupBox("SECTION A — CLASSIFICATION")
         lay_class = QVBoxLayout(box_class)
         lay_class.setSpacing(8)
 
         self.lbl_fabric_type = QLabel("COTTON")
-        self.lbl_fabric_type.setStyleSheet("font-size: 22px; font-weight: 800; color: #00A3FF;")
+        self.lbl_fabric_type.setStyleSheet("font-size: 20px; font-weight: 800; color: #e2e8f0;")
 
         self.lbl_fabric_conf = QLabel("Confidence: 96.4%")
-        self.lbl_fabric_conf.setStyleSheet("font-size: 13px; font-weight: bold; color: #10b981;")
+        self.lbl_fabric_conf.setStyleSheet("font-size: 12px; font-weight: bold; color: #94a3b8;")
 
         self.progress_conf = QProgressBar()
         self.progress_conf.setValue(96)
-        self.progress_conf.setFixedHeight(8)
+        self.progress_conf.setFixedHeight(6)
         self.progress_conf.setTextVisible(False)
         self.progress_conf.setStyleSheet(
-            "QProgressBar { background: #1e293b; border-radius: 4px; } "
-            "QProgressBar::chunk { background: #00A3FF; border-radius: 4px; }"
+            "QProgressBar { background: #1e293b; border-radius: 3px; border: none; } "
+            "QProgressBar::chunk { background: #0284c7; border-radius: 3px; }"
         )
 
         lay_class.addWidget(self.lbl_fabric_type)
@@ -274,7 +247,7 @@ class DashboardPage(QWidget):
         lay_class.addWidget(self.progress_conf)
         side_lay.addWidget(box_class)
 
-        box_defect = QGroupBox("SECTION B — DEFECT INSPECTION")
+        box_defect = QGroupBox("SECTION B — INSPECTION")
         lay_defect = QVBoxLayout(box_defect)
         lay_defect.setSpacing(8)
 
@@ -282,21 +255,21 @@ class DashboardPage(QWidget):
         self.lbl_defect_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_defect_badge.setFixedHeight(36)
         self.lbl_defect_badge.setStyleSheet(
-            "font-size: 14px; font-weight: bold; background: #065f46; color: #34d399; border-radius: 6px;"
+            "font-size: 13px; font-weight: bold; background: #064e3b; color: #a7f3d0; border-radius: 4px; border: 1px solid #059669;"
         )
 
         self.lbl_defect_count = QLabel("Defects Detected: 0")
         self.lbl_defect_count.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_defect_count.setStyleSheet("font-size: 13px; font-weight: bold; color: #cbd5e1;")
+        self.lbl_defect_count.setStyleSheet("font-size: 12px; font-weight: bold; color: #94a3b8;")
 
         lay_defect.addWidget(self.lbl_defect_badge)
         lay_defect.addWidget(self.lbl_defect_count)
         side_lay.addWidget(box_defect)
 
-        box_op = QGroupBox("SECTION C — OPERATOR CONTROL PANEL")
+        box_op = QGroupBox("SECTION C — CONTROL PANEL")
         lay_op = QVBoxLayout(box_op)
-        lay_op.setSpacing(6)
-        lay_op.setContentsMargins(10, 15, 10, 10)
+        lay_op.setSpacing(8)
+        lay_op.setContentsMargins(12, 16, 12, 12)
 
         lbl_roll = QLabel("ROLL ID")
         lbl_roll.setStyleSheet("font-size: 10px; font-weight: bold; color: #64748b; letter-spacing: 1px;")
@@ -309,105 +282,68 @@ class DashboardPage(QWidget):
         lbl_override = QLabel("MANUAL OVERRIDE")
         lbl_override.setStyleSheet("font-size: 10px; font-weight: bold; color: #64748b; letter-spacing: 1px;")
         self.override_combo = QComboBox()
-        self.override_combo.addItems(["AI Quality Decision", "Force Accept", "Force Reject", "Needs QC Review"])
+        self.override_combo.addItems(["AI Quality Decision", "Force Accept", "Force Reject"])
         self.override_combo.setMinimumHeight(34)
         self.override_combo.currentTextChanged.connect(self.handle_override_change)
         lay_op.addWidget(lbl_override)
         lay_op.addWidget(self.override_combo)
 
-        self.btn_accept = QPushButton("✔ACCEPT ROLL")
-        self.btn_reject = QPushButton("⚠REJECT ROLL")
-        self.btn_review = QPushButton("🔍REVIEW ROLL")
+        self.btn_accept = QPushButton("✔ ACCEPT ROLL")
+        self.btn_reject = QPushButton("⚠ REJECT ROLL")
 
-        for b in [self.btn_accept, self.btn_reject, self.btn_review]:
+        for b in [self.btn_accept, self.btn_reject]:
             b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setMinimumHeight(36)
+            b.setMinimumHeight(38)
 
         self.btn_accept.setStyleSheet(
-            "QPushButton { background-color: #10b981; color: white; font-weight: bold; "
-            "border-radius: 6px; font-size: 13px; } QPushButton:hover { background-color: #059669; }"
+            "QPushButton { background-color: #064e3b; color: #d1fae5; font-weight: bold; border: 1px solid #022c22; "
+            "border-radius: 6px; font-size: 13px; } QPushButton:hover { background-color: #065f46; }"
         )
+        
         self.btn_reject.setStyleSheet(
-            "QPushButton { background-color: #ef4444; color: white; font-weight: bold; "
-            "border-radius: 6px; font-size: 13px; } QPushButton:hover { background-color: #dc2626; }"
-        )
-        self.btn_review.setStyleSheet(
-            "QPushButton { background-color: #f59e0b; color: white; font-weight: bold; "
-            "border-radius: 6px; font-size: 12px; } QPushButton:hover { background-color: #d97706; }"
+            "QPushButton { background-color: #7f1d1d; color: #fee2e2; font-weight: bold; border: 1px solid #450a0a; "
+            "border-radius: 6px; font-size: 13px; } QPushButton:hover { background-color: #991b1b; }"
         )
 
         self.btn_accept.clicked.connect(lambda: self.execute_quality_decision("ACCEPTED"))
         self.btn_reject.clicked.connect(lambda: self.execute_quality_decision("REJECTED"))
-        self.btn_review.clicked.connect(lambda: self.execute_quality_decision("NEEDS REVIEW"))
 
-        lay_op.addSpacing(4)
+        lay_op.addSpacing(8)
         lay_op.addWidget(self.btn_accept)
         lay_op.addWidget(self.btn_reject)
-        lay_op.addWidget(self.btn_review)
 
         side_lay.addWidget(box_op)
         side_lay.addStretch()
 
         parent_splitter.addWidget(self.sidebar)
 
-    # ------------------------------------------------------------
-    # THEME
-    # ------------------------------------------------------------
     def apply_theme(self, is_dark):
         if is_dark:
             self.setStyleSheet("background-color: #0b0f19; color: #f8fafc;")
-            self.status_frame.setStyleSheet("background-color: #111827; border-bottom: 1px solid #1e293b; border-radius: 8px;")
-            self.ctrl_frame.setStyleSheet("background-color: #111827; border-bottom: 1px solid #1e293b; border-radius: 8px;")
+            self.status_frame.setStyleSheet("background-color: #111827; border: 1px solid #1e293b; border-radius: 6px;")
+            self.ctrl_frame.setStyleSheet("background-color: #111827; border: 1px solid #1e293b; border-radius: 6px;")
             self.sidebar.setStyleSheet(
-                "QFrame { background: #111827; border-radius: 10px; border: 1px solid #1e293b; } "
-                "QGroupBox { font-size: 10px; font-weight: bold; color: #0ea5e9; border: 1px solid #1e293b; "
-                "border-radius: 8px; margin-top: 10px; padding-top: 15px; } "
+                "QFrame { background: #111827; border-radius: 6px; border: 1px solid #1e293b; } "
+                "QGroupBox { font-size: 11px; font-weight: 800; color: #94a3b8; border: 1px solid #1e293b; "
+                "border-radius: 6px; margin-top: 10px; padding-top: 15px; } "
                 "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }"
             )
             input_style = (
-                "QLineEdit { background: #1e293b; border: 1px solid #334155; border-radius: 6px; "
+                "QLineEdit { background: #0f172a; border: 1px solid #334155; border-radius: 4px; "
                 "color: #f8fafc; padding: 6px 10px; font-size: 12px; } "
-                "QLineEdit:focus { border: 1px solid #0ea5e9; }"
-            )
-            combo_style = (
-                "QComboBox { background: #1e293b; border: 1px solid #334155; border-radius: 6px; "
-                "color: #f8fafc; padding: 6px 10px; font-size: 12px; } "
-                "QComboBox QAbstractItemView { background: #1e293b; color: #f8fafc; "
-                "selection-background-color: #0ea5e9; }"
-            )
-            self.input_url.setStyleSheet(input_style)
-            self.combo_source.setStyleSheet(combo_style)
-            self.override_combo.setStyleSheet(combo_style)
-            self.input_roll_id.setStyleSheet(input_style)
-        else:
-            self.setStyleSheet("background-color: #f4f6f9; color: #0f172a;")
-            self.status_frame.setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0; border-radius: 8px;")
-            self.ctrl_frame.setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0; border-radius: 8px;")
-            self.sidebar.setStyleSheet(
-                "QFrame { background: #ffffff; border-radius: 10px; border: 1px solid #e2e8f0; } "
-                "QGroupBox { font-size: 10px; font-weight: bold; color: #0284c7; border: 1px solid #cbd5e1; "
-                "border-radius: 8px; margin-top: 10px; padding-top: 15px; } "
-                "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }"
-            )
-            input_style = (
-                "QLineEdit { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; "
-                "color: #0f172a; padding: 6px 10px; font-size: 12px; } "
                 "QLineEdit:focus { border: 1px solid #0284c7; }"
             )
             combo_style = (
-                "QComboBox { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; "
-                "color: #0f172a; padding: 6px 10px; font-size: 12px; } "
-                "QComboBox QAbstractItemView { background: #f8fafc; color: #0f172a; "
-                "selection-background-color: #0284c7; }"
+                "QComboBox { background: #0f172a; border: 1px solid #334155; border-radius: 4px; "
+                "color: #f8fafc; padding: 6px 10px; font-size: 12px; } "
+                "QComboBox QAbstractItemView { background: #0f172a; color: #f8fafc; "
+                "selection-background-color: #1e293b; }"
             )
             self.input_url.setStyleSheet(input_style)
             self.combo_source.setStyleSheet(combo_style)
             self.override_combo.setStyleSheet(combo_style)
             self.input_roll_id.setStyleSheet(input_style)
 
-    # ------------------------------------------------------------
-    # TOGGLES
-    # ------------------------------------------------------------
     def toggle_boxes(self):
         self.show_boxes = not self.show_boxes
         self.btn_toggle_boxes.setText("🟩 Bounding Boxes ON" if self.show_boxes else "⬜ Bounding Boxes OFF")
@@ -418,9 +354,6 @@ class DashboardPage(QWidget):
         self.btn_toggle_labels.setText("🏷️ Labels ON" if self.show_labels else "🏷️ Labels OFF")
         self.refresh_canvas_display()
 
-    # ------------------------------------------------------------
-    # CAMERA 
-    # ------------------------------------------------------------
     def toggle_camera(self):
         if self.is_camera_connected:
             self.disconnect_camera()
@@ -438,24 +371,20 @@ class DashboardPage(QWidget):
         try:
             self.camera_cap = cv2.VideoCapture(cam_src)
             if not self.camera_cap.isOpened():
-                show_message_dialog(self, "Camera Unavailable", "The camera source could not be opened. Check the source and try again.", "warning", "OK", getattr(self.parent, 'is_dark_mode', True))
-                self.led_cam.setText("🔴 CAMERA OFFLINE")
-                self.led_cam.setStyleSheet("font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 4px; background-color: #7f1d1d; color: #fca5a5;")
+                show_message_dialog(self, "Camera Unavailable", "Check the source and try again.", "warning", "OK", True)
                 return
 
             self.is_camera_connected = True
             self.btn_camera.setText("■  STOP CAMERA")
             self.btn_camera.setStyleSheet(
-                "QPushButton { background-color: #ef4444; color: white; font-weight: bold; "
-                "padding: 6px 16px; border-radius: 6px; border: none; font-size: 12px; } "
-                "QPushButton:hover { background-color: #dc2626; }"
+                "QPushButton { background-color: #991b1b; color: white; font-weight: bold; "
+                "padding: 6px 16px; border-radius: 4px; border: none; font-size: 12px; } "
+                "QPushButton:hover { background-color: #7f1d1d; }"
             )
-            self.led_cam.setText("🟢 CAMERA ONLINE")
-            self.led_cam.setStyleSheet("font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 4px; background-color: #065f46; color: #34d399;")
             self.timer.start(100) 
-            show_message_dialog(self, "Camera Ready", "The camera is now streaming.", "success", "DONE", getattr(self.parent, 'is_dark_mode', True))
+            show_message_dialog(self, "Camera Ready", "The camera is now streaming.", "success", "DONE", True)
         except Exception:
-            show_message_dialog(self, "Camera Unavailable", "The camera could not be started. Check the source and try again.", "error", "CLOSE", getattr(self.parent, 'is_dark_mode', True))
+            show_message_dialog(self, "Camera Unavailable", "Error starting camera.", "error", "CLOSE", True)
 
     def disconnect_camera(self):
         self.timer.stop()
@@ -465,12 +394,10 @@ class DashboardPage(QWidget):
         self.is_camera_connected = False
         self.btn_camera.setText("▶  START CAMERA")
         self.btn_camera.setStyleSheet(
-            "QPushButton { background-color: #0ea5e9; color: white; font-weight: bold; "
-            "padding: 6px 16px; border-radius: 6px; border: none; font-size: 12px; } "
-            "QPushButton:hover { background-color: #0284c7; }"
+            "QPushButton { background-color: #334155; color: white; font-weight: bold; "
+            "padding: 6px 16px; border-radius: 4px; border: none; font-size: 12px; } "
+            "QPushButton:hover { background-color: #475569; }"
         )
-        self.led_cam.setText("🔴 CAMERA OFFLINE")
-        self.led_cam.setStyleSheet("font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 4px; background-color: #7f1d1d; color: #fca5a5;")
 
     def update_camera_feed(self):
         if not self.camera_cap or not self.camera_cap.isOpened():
@@ -478,6 +405,7 @@ class DashboardPage(QWidget):
         ret, frame = self.camera_cap.read()
         if ret:
             self.current_frame = frame
+            self.refresh_canvas_display()
             self.analyze_frame(frame)
             
             import time
@@ -489,40 +417,6 @@ class DashboardPage(QWidget):
                 self.last_auto_save_time = current_time
                 self.auto_save_to_results() 
 
-    def auto_save_to_results(self):
-        if self.current_frame is None:
-            return
-            
-        batch_id = self.current_batch_id
-        base_dir = os.path.abspath(os.path.join(os.getcwd(), "captured_batches"))
-        batch_dir = os.path.join(base_dir, batch_id)
-        os.makedirs(batch_dir, exist_ok=True)
-        
-        img_filename = f"live_{datetime.now().strftime('%H%M%S')}.jpg"
-        filepath = os.path.join(batch_dir, img_filename)
-        cv2.imwrite(filepath, self.current_frame)
-        
-        d_status = "DEFECT DETECTED" if len(self.current_defects) > 0 else "PASS"
-        
-        new_record = {
-            "batch_id": batch_id,
-            "filename": img_filename,
-            "filepath": filepath,
-            "file_path": filepath,
-            "type": self.current_fabric_type,
-            "conf": self.current_fabric_conf,
-            "defect_status": d_status,
-            "defects": self.current_defects
-        }
-        
-        if not hasattr(self, 'manual_captured_results'):
-            self.manual_captured_results = []
-            
-        self.manual_captured_results.append(new_record)
-        
-        results_page = self.parent.pages.widget(4)
-        if hasattr(results_page, 'load_new_batch'):
-            results_page.load_new_batch(self.manual_captured_results)
     def load_sample_image(self, file_path=None):
         if not file_path:
             captured_dir = "captured_batches"
@@ -541,96 +435,99 @@ class DashboardPage(QWidget):
                 self.current_frame = img
                 self.analyze_frame(img, file_path)
 
-    # ------------------------------------------------------------
-    # ANALYSIS 
-    # ------------------------------------------------------------
     def analyze_frame(self, frame, img_path=None):
         if frame is None:
             return
+        if self.ai_worker is not None and self.ai_worker.isRunning():
+            return
 
-        # 1. Defect Detection
-        defect_res = self.defect_detector.detect(frame)
+        self.lbl_fabric_type.setText("⏳ ANALYZING...")
+        self.lbl_fabric_type.setStyleSheet("font-size: 16px; font-weight: 800; color: #94a3b8;")
+        self.progress_conf.setStyleSheet(
+            "QProgressBar { background: #1e293b; border-radius: 3px; border: none; } "
+            "QProgressBar::chunk { background: #64748b; border-radius: 3px; }"
+        )
+
+        self.ai_worker = AIWorker(self.classifier, self.defect_detector, frame, img_path)
+        self.ai_worker.result_ready.connect(self.on_analysis_finished)
+        self.ai_worker.start()
+
+    def on_analysis_finished(self, class_res, defect_res, img_path):
         self.current_defects = defect_res.get("defects", [])
-
         d_count = defect_res.get("defect_count", 0)
         d_status = defect_res.get("status", "PASS")
 
         if d_status == "DEFECT DETECTED":
             self.lbl_defect_badge.setText(f"⚠ {d_status}")
-            self.lbl_defect_badge.setStyleSheet("font-size: 14px; font-weight: bold; background: #991b1b; color: #fca5a5; border-radius: 6px;")
+            self.lbl_defect_badge.setStyleSheet("font-size: 13px; font-weight: bold; background: #7f1d1d; color: #fca5a5; border-radius: 4px; border: 1px solid #991b1b;")
         else:
             self.lbl_defect_badge.setText("✔ PASS / CLEAN")
-            self.lbl_defect_badge.setStyleSheet("font-size: 14px; font-weight: bold; background: #065f46; color: #34d399; border-radius: 6px;")
+            self.lbl_defect_badge.setStyleSheet("font-size: 13px; font-weight: bold; background: #064e3b; color: #a7f3d0; border-radius: 4px; border: 1px solid #059669;")
 
         self.lbl_defect_count.setText(f"Defects Detected: {d_count}")
-
-        # 2. Fabric Classification - (Live Camera Fix)
-        if not img_path:
-            temp_path = "temp_live_frame.jpg"
-            cv2.imwrite(temp_path, frame)
-            img_path = temp_path
-
-        class_res = self.classifier.predict_detailed(img_path)
         self.current_fabric_type = class_res["fabric_type"]
         self.current_fabric_conf = class_res["confidence"]
 
         self.lbl_fabric_type.setText(self.current_fabric_type.upper())
+        self.lbl_fabric_type.setStyleSheet("font-size: 20px; font-weight: 800; color: #e2e8f0;")
         self.lbl_fabric_conf.setText(f"Confidence: {self.current_fabric_conf:.1f}%")
         self.progress_conf.setValue(int(self.current_fabric_conf))
-
+        self.progress_conf.setStyleSheet(
+            "QProgressBar { background: #1e293b; border-radius: 3px; border: none; } "
+            "QProgressBar::chunk { background: #0284c7; border-radius: 3px; }"
+        )
         self.refresh_canvas_display()
 
     def refresh_canvas_display(self):
-        if self.current_frame is None:
-            return
-
+        if self.current_frame is None: return
         overlay_frame = self.defect_detector.draw_overlays(
-            self.current_frame,
-            self.current_defects,
-            show_boxes=self.show_boxes,
-            show_labels=self.show_labels
+            self.current_frame.copy(), self.current_defects, show_boxes=self.show_boxes, show_labels=self.show_labels
         )
         h, w, ch = overlay_frame.shape
         rgb = cv2.cvtColor(overlay_frame, cv2.COLOR_BGR2RGB)
         qimg = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
         self.canvas.set_image(QPixmap.fromImage(qimg))
 
+    def auto_save_to_results(self):
+        if self.current_frame is None: return
+        batch_id = self.current_batch_id
+        base_dir = os.path.abspath(os.path.join(os.getcwd(), "captured_batches"))
+        batch_dir = os.path.join(base_dir, batch_id)
+        os.makedirs(batch_dir, exist_ok=True)
+        img_filename = f"live_{datetime.now().strftime('%H%M%S')}.jpg"
+        filepath = os.path.join(batch_dir, img_filename)
+        cv2.imwrite(filepath, self.current_frame)
+        d_status = "DEFECT DETECTED" if len(self.current_defects) > 0 else "PASS"
+        new_record = {
+            "batch_id": batch_id, "filename": img_filename, "filepath": filepath, "file_path": filepath,
+            "type": self.current_fabric_type, "conf": self.current_fabric_conf,
+            "defect_status": d_status, "defects": self.current_defects
+        }
+        if not hasattr(self, 'manual_captured_results'): self.manual_captured_results = []
+        self.manual_captured_results.append(new_record)
+        results_page = self.parent.pages.widget(4)
+        if hasattr(results_page, 'load_new_batch'): results_page.load_new_batch(self.manual_captured_results)
+
     def trigger_manual_inspection(self):
         if self.current_frame is not None:
             batch_id = self.current_batch_id
-            
             base_dir = os.path.abspath(os.path.join(os.getcwd(), "captured_batches"))
             batch_dir = os.path.join(base_dir, batch_id)
             os.makedirs(batch_dir, exist_ok=True)
-            
             img_filename = f"img_{datetime.now().strftime('%H%M%S')}.jpg"
             filepath = os.path.join(batch_dir, img_filename)
             cv2.imwrite(filepath, self.current_frame)
-            
             d_status = "DEFECT DETECTED" if len(self.current_defects) > 0 else "PASS"
-            
             new_record = {
-                "batch_id": batch_id,
-                "filename": img_filename,
-                "filepath": filepath,
-                "file_path": filepath,
-                "type": self.current_fabric_type,
-                "conf": self.current_fabric_conf,
-                "defect_status": d_status,
-                "defects": self.current_defects
+                "batch_id": batch_id, "filename": img_filename, "filepath": filepath, "file_path": filepath,
+                "type": self.current_fabric_type, "conf": self.current_fabric_conf,
+                "defect_status": d_status, "defects": self.current_defects
             }
-            
-            if not hasattr(self, 'manual_captured_results'):
-                self.manual_captured_results = []
-                
+            if not hasattr(self, 'manual_captured_results'): self.manual_captured_results = []
             self.manual_captured_results.append(new_record)
-            
             results_page = self.parent.pages.widget(4)
-            if hasattr(results_page, 'load_new_batch'):
-                results_page.load_new_batch(self.manual_captured_results)
-                
+            if hasattr(results_page, 'load_new_batch'): results_page.load_new_batch(self.manual_captured_results)
             self.lbl_batch_tag.setText(f"BATCH: {batch_id}")
-
             show_message_dialog(self, "Inspection Complete", "The image was inspected and ADDED to the Results page.", "success", "OK", getattr(self.parent, 'is_dark_mode', True))
         else:
             self.load_sample_image()
@@ -638,82 +535,55 @@ class DashboardPage(QWidget):
     def handle_override_change(self, text):
         if text != "AI Quality Decision":
             self.lbl_defect_badge.setText(f"MANUAL: {text.upper()}")
-            self.lbl_defect_badge.setStyleSheet("font-size: 13px; font-weight: bold; background: #1e293b; color: #38bdf8; border-radius: 6px;")
+            self.lbl_defect_badge.setStyleSheet("font-size: 13px; font-weight: bold; background: #1e293b; color: #38bdf8; border-radius: 4px; border: 1px solid #334155;")
 
-    # ------------------------------------------------------------
-    # BATCH PROCESSING (Highest Confidence Logic + filepath fix)
-    # ------------------------------------------------------------
     def process_image_batch(self, batch_id, valid_files):
-        if not valid_files:
-            return
+        if not valid_files: return
         self.current_batch_id = batch_id
         self.lbl_batch_tag.setText(f"BATCH: {batch_id}")
-
         batch_results = []
         best_file = valid_files[0]
         highest_conf = -1.0
-
         for fp in valid_files:
             img = cv2.imread(fp)
-            
-            if img is None:
-                continue
-                
+            if img is None: continue
             c_res = self.classifier.predict_detailed(fp)
             d_res = self.defect_detector.detect(img)
-            
             if c_res["confidence"] > highest_conf:
                 highest_conf = c_res["confidence"]
                 best_file = fp
-
             abs_fp = os.path.abspath(fp)
-
             batch_results.append({
-                "batch_id": batch_id,
-                "filename": os.path.basename(abs_fp),
-                "filepath": abs_fp, 
-                "file_path": abs_fp,
-                "type": c_res["fabric_type"],
-                "conf": c_res["confidence"],
-                "defect_status": d_res["status"],
-                "defects": d_res["defects"]
+                "batch_id": batch_id, "filename": os.path.basename(abs_fp), "filepath": abs_fp, 
+                "file_path": abs_fp, "type": c_res["fabric_type"], "conf": c_res["confidence"],
+                "defect_status": d_res["status"], "defects": d_res["defects"]
             })
-
-        if best_file:
-            self.load_sample_image(best_file)
-
+        if best_file: self.load_sample_image(best_file)
         results_page = self.parent.pages.widget(4)
-        if hasattr(results_page, 'load_new_batch'):
-            results_page.load_new_batch(batch_results)
+        if hasattr(results_page, 'load_new_batch'): results_page.load_new_batch(batch_results)
 
     def execute_quality_decision(self, decision):
         roll_id = self.input_roll_id.text().strip() or self.current_roll_id
         override_text = self.override_combo.currentText()
         is_overridden = (override_text != "AI Quality Decision")
-
         d_count = len(self.current_defects)
         primary_d = self.current_defects[0]["type"] if self.current_defects else "None"
         primary_d_conf = self.current_defects[0]["confidence"] if self.current_defects else 0.0
+        
+        operator_name = "QC_INSPECTOR_01"
+        if self.parent and hasattr(self.parent, 'current_user') and self.parent.current_user:
+            u = self.parent.current_user
+            operator_name = " ".join(filter(None, [u.get("fname"), u.get("lname")])).strip() or u.get("email", "QC_INSPECTOR_01")
 
         success, msg = save_inspection_record(
-            batch_id=self.current_batch_id,
-            session_id=f"{roll_id}_img_01.jpg",
-            user_id=1,
-            final_fabric_type=self.current_fabric_type,
-            confidence_score=self.current_fabric_conf,
-            is_overridden=is_overridden,
-            action_status=decision,
-            roll_id=roll_id,
-            defect_status="DEFECT DETECTED" if d_count > 0 else "PASS",
-            defect_type=primary_d,
-            defect_count=d_count,
-            defect_confidence=primary_d_conf,
-            ai_decision="REJECT" if d_count > 0 else "PASS",
-            operator_decision=decision,
-            override_reason=override_text if is_overridden else "",
-            operator_name="QC_INSPECTOR_01"
+            batch_id=self.current_batch_id, session_id=f"{roll_id}_img_01.jpg", user_id=1,
+            final_fabric_type=self.current_fabric_type, confidence_score=self.current_fabric_conf,
+            is_overridden=is_overridden, action_status=decision, roll_id=roll_id,
+            defect_status="DEFECT DETECTED" if d_count > 0 else "PASS", defect_type=primary_d,
+            defect_count=d_count, defect_confidence=primary_d_conf, ai_decision="REJECT" if d_count > 0 else "PASS",
+            operator_decision=decision, override_reason=override_text if is_overridden else "",
+            operator_name=operator_name  
         )
-
         if success:
             show_message_dialog(self, "Decision Saved", f"Roll {roll_id} marked as {decision}.", "success", "DONE", getattr(self.parent, 'is_dark_mode', True))
             self.parent.switch_page(5)

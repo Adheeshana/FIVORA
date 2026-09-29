@@ -89,5 +89,14 @@
     "password_hash": "$2b$12$N20BN2hnf9iTtmooDjW4I.3fAtWWxIc6.AyPY2DjnnEZxEVSQjfra",
     "role": "Operator",
     "status": "Pending"
+  },
+  "rcsiriwardhana@gmail.com": {
+    "id": 11,
+    "fname": "renuka",
+    "lname": "siriwardhana",
+    "email": "rcsiriwardhana@gmail.com",
+    "password_hash": "$2b$12$mMsSJKQbXuytEC2h8pJ6y.u5dJufOp1Fh/sJvTSdAlnioEV8XQsja",
+    "role": "Operator",
+    "status": "Pending"
   }
 }

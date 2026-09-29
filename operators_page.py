@@ -1,172 +1,179 @@
+import os
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
-    QTableWidget, QTableWidgetItem, QHeaderView
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, 
+    QTableWidget, QTableWidgetItem, QHeaderView, QPushButton, QScrollArea
 )
 from PyQt6.QtCore import Qt
-from database import list_operators, update_operator_status, fetch_activity_logs
+from database import get_all_users, update_user_status, get_session_logs
 from custom_dialog import show_message_dialog
-
 
 class OperatorsPage(QWidget):
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
-        self.table = QTableWidget()
-        self.activity_table = QTableWidget()
+        self.is_dark_mode = True
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(34, 28, 34, 28)
-        layout.setSpacing(18)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
 
-        header = QHBoxLayout()
-        header.setSpacing(12)
-        title_block = QVBoxLayout()
-        title_block.setSpacing(3)
-        title = QLabel("Operator Management")
-        title.setObjectName("pageTitle")
-        subtitle = QLabel("Review access requests, manage operator accounts, and monitor sign-in activity.")
-        subtitle.setObjectName("pageSubtitle")
-        title_block.addWidget(title)
-        title_block.addWidget(subtitle)
-        header.addLayout(title_block)
-        header.addStretch()
+        # Scroll area එකක් දැම්මා සම්පූර්ණ පිටුවම ලස්සනට Scroll වෙන්න
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        
+        container = QWidget()
+        self.content_layout = QVBoxLayout(container)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(20)
 
-        self.operator_count = QLabel("")
-        self.operator_count.setObjectName("countBadge")
-        header.addWidget(self.operator_count, alignment=Qt.AlignmentFlag.AlignVCenter)
-        layout.addLayout(header)
+        # Header Title
+        title_layout = QHBoxLayout()
+        title_box = QVBoxLayout()
+        self.page_title = QLabel("Operator Management")
+        self.page_subtitle = QLabel("Review access requests, manage operator accounts, and monitor sign-in activity.")
+        title_box.addWidget(self.page_title)
+        title_box.addWidget(self.page_subtitle)
+        
+        self.badge_count = QLabel("0 registered operator(s)")
+        title_layout.addLayout(title_box)
+        title_layout.addStretch()
+        title_layout.addWidget(self.badge_count)
+        self.content_layout.addLayout(title_layout)
 
-        self.operator_panel = QFrame()
-        self.operator_panel.setObjectName("contentPanel")
-        operator_panel_layout = QVBoxLayout(self.operator_panel)
-        operator_panel_layout.setContentsMargins(14, 14, 14, 14)
-        operator_panel_layout.setSpacing(10)
+        # 1. Operators Table Section
+        self.table_operators = QTableWidget()
+        self.table_operators.setColumnCount(4)
+        self.table_operators.setHorizontalHeaderLabels(["OPERATOR", "EMAIL", "STATUS", "ACTION"])
+        self.table_operators.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.table_operators.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table_operators.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.table_operators.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.table_operators.setColumnWidth(2, 140)
+        self.table_operators.setColumnWidth(3, 180)
+        self.table_operators.setFixedHeight(220)
+        self.content_layout.addWidget(self.table_operators)
 
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Operator", "Email", "Status", "Action"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.table.setColumnWidth(0, 180)
-        self.table.setColumnWidth(1, 280)
-        self.table.setColumnWidth(2, 160)
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.verticalHeader().setDefaultSectionSize(58)
-        self.table.setAlternatingRowColors(True)
-        self.table.setShowGrid(False)
-        self.table.setMinimumHeight(230)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
-        operator_panel_layout.addWidget(self.table)
-        layout.addWidget(self.operator_panel)
+        # 2. Session Activity Section
+        self.session_title = QLabel("Session activity")
+        self.content_layout.addWidget(self.session_title)
 
-        activity_header = QHBoxLayout()
-        activity_title = QLabel("Session activity")
-        activity_title.setObjectName("sectionTitle")
-        activity_header.addWidget(activity_title)
-        activity_header.addStretch()
-        activity_hint = QLabel("Login and logout history")
-        activity_hint.setObjectName("sectionHint")
-        activity_header.addWidget(activity_hint)
-        layout.addLayout(activity_header)
+        self.table_sessions = QTableWidget()
+        self.table_sessions.setColumnCount(4)
+        self.table_sessions.setHorizontalHeaderLabels(["OPERATOR", "EMAIL", "LOG-IN TIMESTAMP", "LOG-OUT TIMESTAMP"])
+        self.table_sessions.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.table_sessions.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table_sessions.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.table_sessions.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self.table_sessions.setFixedHeight(250)
+        self.content_layout.addWidget(self.table_sessions)
 
-        self.activity_table.setColumnCount(4)
-        self.activity_table.setHorizontalHeaderLabels(["Operator", "Email", "Log-in timestamp", "Log-out timestamp"])
-        self.activity_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.activity_table.verticalHeader().setDefaultSectionSize(42)
-        self.activity_table.setAlternatingRowColors(True)
-        self.activity_table.setShowGrid(False)
-        self.activity_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
-        layout.addWidget(self.activity_table, 1)
+        scroll.setWidget(container)
+        main_layout.addWidget(scroll)
+
         self.apply_theme(True)
-
-    def apply_theme(self, is_dark):
-        if is_dark:
-            self.setStyleSheet("""
-                QWidget { background-color: #0b0f19; color: #f8fafc; }
-                QLabel#pageTitle { color: #f8fafc; font-size: 24px; font-weight: 800; }
-                QLabel#pageSubtitle, QLabel#sectionHint { color: #64748b; font-size: 12px; }
-                QLabel#sectionTitle { color: #e2e8f0; font-size: 15px; font-weight: 700; }
-                QLabel#countBadge { background-color: #12283a; color: #7dd3fc; border: 1px solid #1e5b7a; border-radius: 14px; padding: 7px 13px; font-size: 12px; font-weight: 700; }
-                QFrame#contentPanel { background-color: #111827; border: 1px solid #1e293b; border-radius: 10px; }
-            """)
-            table_style = "QTableWidget { background-color: #111827; color: #e2e8f0; border: none; outline: none; alternate-background-color: #152033; } QTableWidget::item { padding: 8px 10px; border-bottom: 1px solid #1e293b; }"
-            header_style = "QHeaderView::section { background-color: #182235; color: #94a3b8; border: none; border-bottom: 1px solid #334155; padding: 11px 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; }"
-        else:
-            self.setStyleSheet("""
-                QWidget { background-color: #f4f6f9; color: #0f172a; }
-                QLabel#pageTitle { color: #0f172a; font-size: 24px; font-weight: 800; }
-                QLabel#pageSubtitle, QLabel#sectionHint { color: #64748b; font-size: 12px; }
-                QLabel#sectionTitle { color: #334155; font-size: 15px; font-weight: 700; }
-                QLabel#countBadge { background-color: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; border-radius: 14px; padding: 7px 13px; font-size: 12px; font-weight: 700; }
-                QFrame#contentPanel { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; }
-            """)
-            table_style = "QTableWidget { background-color: #ffffff; color: #0f172a; border: none; outline: none; alternate-background-color: #f8fafc; } QTableWidget::item { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }"
-            header_style = "QHeaderView::section { background-color: #f1f5f9; color: #64748b; border: none; border-bottom: 1px solid #cbd5e1; padding: 11px 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; }"
-        for table in (self.table, self.activity_table):
-            table.setStyleSheet(table_style)
-            table.horizontalHeader().setStyleSheet(header_style)
+        self.refresh_data()
 
     def refresh_data(self):
-        operators = list_operators()
-        self.operator_count.setText(f"{len(operators)} registered operator(s)")
-        self.table.setRowCount(len(operators))
-        for row, operator in enumerate(operators):
-            name = " ".join(filter(None, [operator.get("fname"), operator.get("lname")])).strip()
-            for column, value in enumerate([name, str(operator.get("email", ""))]):
-                item = QTableWidgetItem(value)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-                self.table.setItem(row, column, item)
+        self.load_operators()
+        self.load_sessions()
 
-            status = str(operator.get("status", "Pending"))
-            status_badge = QLabel("Pending Approval" if status.lower() == "pending" else status)
-            status_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            status_badge.setStyleSheet(self.status_badge_style(status))
-            self.table.setCellWidget(row, 2, status_badge)
+    def load_operators(self):
+        users = get_all_users()
+        self.table_operators.setRowCount(0)
+        self.badge_count.setText(f"{len(users)} registered operator(s)")
 
-            action_panel = QWidget()
-            action_layout = QHBoxLayout(action_panel)
-            action_layout.setContentsMargins(10, 7, 10, 7)
-            action_layout.setSpacing(10)
-            action_layout.addStretch()
-            approve = QPushButton("Approve")
-            approve.setCursor(Qt.CursorShape.PointingHandCursor)
-            approve.setMinimumHeight(32)
-            approve.setStyleSheet(self.action_button_style("approve"))
-            approve.clicked.connect(lambda _, item=operator: self.change_status(item, "Active"))
-            reject = QPushButton("Reject / Deactivate")
-            reject.setCursor(Qt.CursorShape.PointingHandCursor)
-            reject.setMinimumHeight(32)
-            reject.setMinimumWidth(145)
-            reject.setStyleSheet(self.action_button_style("reject"))
-            reject.clicked.connect(lambda _, item=operator: self.change_status(item, "Deactivated"))
-            action_layout.addWidget(approve)
-            action_layout.addWidget(reject)
-            action_layout.addStretch()
-            self.table.setCellWidget(row, 3, action_panel)
+        for row_idx, user in enumerate(users):
+            self.table_operators.insertRow(row_idx)
+            self.table_operators.setRowHeight(row_idx, 45)
 
-        logs = fetch_activity_logs()
-        self.activity_table.setRowCount(len(logs))
-        for row, log in enumerate(logs):
-            values = [log.get("operator_name", ""), log.get("email", ""),
-                      str(log.get("login_timestamp", "")), str(log.get("logout_timestamp", "Still logged in"))]
-            for column, value in enumerate(values):
-                self.activity_table.setItem(row, column, QTableWidgetItem(value))
+            name = f"{user.get('fname', '')} {user.get('lname', '')}".strip() or "N/A"
+            email = user.get('email', 'N/A')
+            status = str(user.get('status', 'Active')).strip().title()
+            user_id = user.get('id')
 
-    def change_status(self, operator, status):
-        if update_operator_status(operator.get("id"), operator.get("email", ""), status):
-            self.refresh_data()
-            return
-        show_message_dialog(self, "Update Failed", "The operator status could not be updated.", "error", "OK", self.parent.is_dark_mode)
+            item_name = QTableWidgetItem(name)
+            item_email = QTableWidgetItem(email)
+            item_status = QTableWidgetItem(status)
+            item_status.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
-    @staticmethod
-    def status_badge_style(status):
-        normalized = status.lower()
-        if normalized == "active":
-            return "QLabel { background-color: #064e3b; color: #6ee7b7; border: 1px solid #10b981; border-radius: 12px; padding: 6px 12px; font-weight: bold; }"
-        if normalized in {"deactivated", "rejected"}:
-            return "QLabel { background-color: #3f1d24; color: #fca5a5; border: 1px solid #ef4444; border-radius: 12px; padding: 6px 12px; font-weight: bold; }"
-        return "QLabel { background-color: #4a3410; color: #fcd34d; border: 1px solid #f59e0b; border-radius: 12px; padding: 6px 12px; font-weight: bold; }"
+            self.table_operators.setItem(row_idx, 0, item_name)
+            self.table_operators.setItem(row_idx, 1, item_email)
+            self.table_operators.setItem(row_idx, 2, item_status)
 
-    @staticmethod
-    def action_button_style(action):
-        if action == "approve":
-            return "QPushButton { background-color: #059669; color: white; border: 1px solid #10b981; border-radius: 6px; padding: 6px 14px; font-weight: bold; } QPushButton:hover { background-color: #10b981; }"
-        return "QPushButton { background-color: #b91c1c; color: white; border: 1px solid #ef4444; border-radius: 6px; padding: 6px 12px; font-weight: bold; } QPushButton:hover { background-color: #ef4444; }"
+            # Action Button එක Status එක අනුව වෙනස් කිරීම
+            btn_action = QPushButton()
+            btn_action.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_action.setFixedHeight(30)
+
+            if status.lower() == "active":
+                btn_action.setText("Deactivate")
+                btn_action.setStyleSheet("QPushButton { background-color: #dc2626; color: white; font-weight: bold; border-radius: 4px; border: none; font-size: 11px; } QPushButton:hover { background-color: #b91c1c; }")
+                btn_action.clicked.connect(lambda _, uid=user_id: self.change_status(uid, "Deactivated"))
+            else:
+                btn_action.setText("Approve")
+                btn_action.setStyleSheet("QPushButton { background-color: #059669; color: white; font-weight: bold; border-radius: 4px; border: none; font-size: 11px; } QPushButton:hover { background-color: #047857; }")
+                btn_action.clicked.connect(lambda _, uid=user_id: self.change_status(uid, "Active"))
+
+            self.table_operators.setCellWidget(row_idx, 3, btn_action)
+
+    def change_status(self, user_id, new_status):
+        success = update_user_status(user_id, new_status)
+        if success:
+            self.load_operators()
+        else:
+            show_message_dialog(self, "Error", "Could not update operator status.", "error", "OK", self.is_dark_mode)
+
+    def load_sessions(self):
+        logs = get_session_logs() if 'get_session_logs' in globals() or 'get_session_logs' in dir() else []
+        try:
+            from database import get_session_logs as fetch_logs
+            logs = fetch_logs()
+        except Exception:
+            logs = []
+
+        self.table_sessions.setRowCount(0)
+        for row_idx, log in enumerate(logs):
+            self.table_sessions.insertRow(row_idx)
+            self.table_sessions.setRowHeight(row_idx, 40)
+
+            name = f"{log.get('fname', '')} {log.get('lname', '')}".strip() or log.get('name', 'N/A')
+            email = log.get('email', 'N/A')
+            login_time = str(log.get('login_time', log.get('signin_time', 'N/A')))
+            logout_time = str(log.get('logout_time', log.get('signout_time', 'None')))
+
+            self.table_sessions.setItem(row_idx, 0, QTableWidgetItem(name))
+            self.table_sessions.setItem(row_idx, 1, QTableWidgetItem(email))
+            self.table_sessions.setItem(row_idx, 2, QTableWidgetItem(login_time))
+            self.table_sessions.setItem(row_idx, 3, QTableWidgetItem(logout_time))
+
+    def apply_theme(self, is_dark):
+        self.is_dark_mode = is_dark
+        if is_dark:
+            self.setStyleSheet("background-color: #0b0f19; color: #f8fafc;")
+            self.page_title.setStyleSheet("font-size: 22px; font-weight: 900; color: #f8fafc;")
+            self.page_subtitle.setStyleSheet("font-size: 12px; color: #94a3b8;")
+            self.session_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #f8fafc; margin-top: 10px;")
+            self.badge_count.setStyleSheet("font-size: 12px; font-weight: bold; color: #38bdf8; background: #1e293b; padding: 6px 12px; border-radius: 6px; border: 1px solid #334155;")
+            
+            table_style = (
+                "QTableWidget { background-color: #111827; gridline-color: #1e293b; color: #f8fafc; border: 1px solid #1e293b; border-radius: 8px; }"
+                "QHeaderView::section { background-color: #1f2937; color: #94a3b8; font-weight: bold; border: none; padding: 6px; font-size: 11px; }"
+                "QTableWidget::item { padding: 5px; border-bottom: 1px solid #1e293b; }"
+            )
+            self.table_operators.setStyleSheet(table_style)
+            self.table_sessions.setStyleSheet(table_style)
+        else:
+            self.setStyleSheet("background-color: #f4f6f9; color: #0f172a;")
+            self.page_title.setStyleSheet("font-size: 22px; font-weight: 900; color: #0f172a;")
+            self.page_subtitle.setStyleSheet("font-size: 12px; color: #64748b;")
+            self.session_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #0f172a; margin-top: 10px;")
+            self.badge_count.setStyleSheet("font-size: 12px; font-weight: bold; color: #0369a1; background: #e0f2fe; padding: 6px 12px; border-radius: 6px; border: 1px solid #bae6fd;")
+            
+            table_style = (
+                "QTableWidget { background-color: #ffffff; gridline-color: #e2e8f0; color: #0f172a; border: 1px solid #e2e8f0; border-radius: 8px; }"
+                "QHeaderView::section { background-color: #f1f5f9; color: #475569; font-weight: bold; border: none; padding: 6px; font-size: 11px; }"
+                "QTableWidget::item { padding: 5px; border-bottom: 1px solid #e2e8f0; }"
+            )
+            self.table_operators.setStyleSheet(table_style)
+            self.table_sessions.setStyleSheet(table_style)

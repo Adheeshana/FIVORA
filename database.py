@@ -9,7 +9,71 @@ LOCAL_USERS_FILE = "local_users_backup.json"
 ADMIN_EMAIL = "admin@gmail.com"
 ADMIN_PASSWORD = "12345678"
 
+import mysql.connector
 
+# ඔබගේ ප්‍රොජෙක්ට් එකේ ඇති MySQL connection විස්තර මෙයට යොදන්න (သို့မဟုတ် පවතින connection function එක භාවිතා කරන්න)
+def get_db_connection():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",      # ඔබේ MySQL password එක
+        database="fivora" # ඔබේ database නම
+    )
+
+def get_all_users():
+    """MySQL වලින් සියලුම Users ලැයිස්තුව ලබා ගැනීම"""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT id, fname, lname, email, role, status FROM users")
+        rows = cursor.fetchall()
+        return rows
+    except Exception as e:
+        print(f"Error fetching users: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_user_status(user_id, status):
+    """MySQL වල Operator කෙනෙකුගේ Status එක වෙනස් කිරීම"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE users SET status = %s WHERE id = %s", (status, user_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating status: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_session_logs():
+    """MySQL වලින් Log-in සහ Log-out විස්තර ලබා ගැනීම"""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT u.fname, u.lname, u.email, a.login_time, a.logout_time 
+            FROM activity_logs a 
+            JOIN users u ON a.user_id = u.id
+            ORDER BY a.id DESC
+        """)
+        rows = cursor.fetchall()
+        return rows
+    except Exception as e:
+        try:
+            cursor.execute("SELECT * FROM activity_logs ORDER BY id DESC")
+            rows = cursor.fetchall()
+            return rows
+        except Exception as err:
+            print(f"Error fetching logs: {err}")
+            return []
+    finally:
+        cursor.close()
+        conn.close()
 def _load_local_users():
     default_pwd_hash = bcrypt.hashpw(b"Password123!", bcrypt.gensalt()).decode('utf-8')
     default_users = {

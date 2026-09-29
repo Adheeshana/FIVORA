@@ -9,6 +9,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QStackedWidget, QLabel, QFrame)
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap, QPainter, QColor # Background එක අඳින්න අලුත් දේවල්
 
 from login import LoginPage
 from signup import SignupPage
@@ -19,20 +20,86 @@ from history_page import HistoryPage
 from operators_page import OperatorsPage
 from database import initialize_database, finish_activity_log
 
+# ==========================================
+# අලුතින් එකතු කළ FULL-SCREEN WELCOME පිටුව
+# ==========================================
+class WelcomePage(QWidget):
+    def __init__(self, parent=None):
+        super().__init__()
+        self.parent = parent
+        
+        # Background පින්තූරය Load කරගැනීම
+        self.bg_pixmap = QPixmap("welcome_fabric.jfif")
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(15)
+
+        # --- Text Section (ප්‍රමාණය ටිකක් ලොකු කළා Full Screen එකට ගැලපෙන්න) ---
+        self.title = QLabel("Welcome to FIVORA")
+        self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.subtitle = QLabel("AI-Powered Industrial Fabric Inspection System")
+        self.subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.desc = QLabel("Automate quality control, detect defects in real-time, and generate insightful reports.")
+        self.desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # --- Button Section ---
+        self.btn_start = QPushButton("Get Started →")
+        self.btn_start.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_start.setFixedSize(240, 55)
+        self.btn_start.clicked.connect(lambda: self.parent.switch_page(0) if self.parent else None) 
+
+        # හිස් ඉඩක් (Margin) දීලා මැදට ගත්තා
+        layout.addStretch()
+        layout.addWidget(self.title)
+        layout.addWidget(self.subtitle)
+        layout.addSpacing(15)
+        layout.addWidget(self.desc)
+        layout.addSpacing(40)
+        layout.addWidget(self.btn_start, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addStretch()
+
+    # මේ කොටසින් තමයි පින්තූරය මුළු තිරයටම අඳින්නේ
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        if not self.bg_pixmap.isNull():
+            # පින්තූරය Screen එකට ගැලපෙන්න Scale කිරීම (Aspect Ratio එක ආරක්ෂා කරමින්)
+            scaled_bg = self.bg_pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+            
+            # පින්තූරය හරියටම මැදට ගන්න
+            x = (self.width() - scaled_bg.width()) // 2
+            y = (self.height() - scaled_bg.height()) // 2
+            painter.drawPixmap(x, y, scaled_bg)
+            
+            # අකුරු පැහැදිලිව පේන්න පින්තූරය උඩින් අඳුරු Transparent තට්ටුවක් (Overlay) දැමීම
+            overlay_color = QColor(11, 15, 25, 190) # 190 කියන්නේ අඳුරු ප්‍රමාණය (0-255)
+            painter.fillRect(self.rect(), overlay_color)
+        else:
+            # පින්තූරය හොයාගන්න බැරි වුණොත් සාමාන්‍ය පාට වැටෙනවා
+            painter.fillRect(self.rect(), QColor("#0b0f19"))
+
+    def apply_theme(self, is_dark):
+        # Background එකේ පින්තූරයක් තියෙන නිසා අකුරු වල Background එක Transparent කළා
+        self.title.setStyleSheet("font-size: 52px; font-weight: 900; color: #ffffff; letter-spacing: 2px; background: transparent;")
+        self.subtitle.setStyleSheet("font-size: 20px; font-weight: bold; color: #38bdf8; background: transparent;")
+        self.desc.setStyleSheet("font-size: 15px; color: #cbd5e1; background: transparent;")
+        self.btn_start.setStyleSheet(
+            "QPushButton { background-color: #0284c7; color: white; font-size: 18px; font-weight: bold; border-radius: 8px; border: none; }"
+            "QPushButton:hover { background-color: #0369a1; }"
+        )
+
 
 class PagesCompatWrapper:
-    """Compatibility helper to allow legacy self.parent.pages.widget(index) access."""
     def __init__(self, main_app):
         self.app = main_app
 
     def widget(self, index):
         mapping = {
-            0: self.app.login_page,
-            1: self.app.signup_page,
-            2: self.app.dashboard_page,
-            3: self.app.upload_page,
-            4: self.app.results_page,
-            5: self.app.history_page,
+            0: self.app.login_page, 1: self.app.signup_page,
+            2: self.app.dashboard_page, 3: self.app.upload_page,
+            4: self.app.results_page, 5: self.app.history_page,
             6: self.app.operators_page
         }
         return mapping.get(index, None)
@@ -50,9 +117,6 @@ class FivoraMainApp(QMainWindow):
         self.current_role = "Operator"
         self.is_dark_mode = True  
 
-        # Root Stacked Widget:
-        # Index 0 -> Auth View (Public mode with Top Header)
-        # Index 1 -> App View (Protected mode with Left Vertical Sidebar)
         self.root_stack = QStackedWidget()
 
         # ==========================================
@@ -63,7 +127,6 @@ class FivoraMainApp(QMainWindow):
         auth_layout.setContentsMargins(0, 0, 0, 0)
         auth_layout.setSpacing(0)
 
-        # Public Top Header Bar
         self.auth_header = QWidget()
         auth_header_layout = QHBoxLayout(self.auth_header)
         auth_header_layout.setContentsMargins(24, 12, 24, 12)
@@ -98,12 +161,14 @@ class FivoraMainApp(QMainWindow):
         auth_header_layout.addSpacing(10)
         auth_header_layout.addWidget(self.btn_auth_theme)
 
-        # Public Pages Stack (Sign In & Sign Up)
         self.auth_stack = QStackedWidget()
+        self.welcome_page = WelcomePage(self)
         self.login_page = LoginPage(self)
         self.signup_page = SignupPage(self)
-        self.auth_stack.addWidget(self.login_page)   # Auth Stack Index 0
-        self.auth_stack.addWidget(self.signup_page)  # Auth Stack Index 1
+        
+        self.auth_stack.addWidget(self.welcome_page) # Index 0
+        self.auth_stack.addWidget(self.login_page)   # Index 1
+        self.auth_stack.addWidget(self.signup_page)  # Index 2
 
         auth_layout.addWidget(self.auth_header)
         auth_layout.addWidget(self.auth_stack)
@@ -116,14 +181,12 @@ class FivoraMainApp(QMainWindow):
         app_layout.setContentsMargins(0, 0, 0, 0)
         app_layout.setSpacing(0)
 
-        # Left Vertical Sidebar
         self.sidebar_widget = QFrame()
         self.sidebar_widget.setFixedWidth(240)
         sidebar_layout = QVBoxLayout(self.sidebar_widget)
         sidebar_layout.setContentsMargins(16, 24, 16, 20)
         sidebar_layout.setSpacing(8)
 
-        # Sidebar Header Branding
         self.sidebar_brand = QLabel("FIVORA")
         self.sidebar_subbrand = QLabel("FABRIC INSPECTION SYSTEM")
         
@@ -131,7 +194,6 @@ class FivoraMainApp(QMainWindow):
         sidebar_layout.addWidget(self.sidebar_subbrand)
         sidebar_layout.addSpacing(24)
 
-        # Sidebar Navigation Buttons
         self.btn_dashboard = QPushButton("  📊   Dashboard")
         self.btn_upload = QPushButton("  📷   Upload / Capture")
         self.btn_results = QPushButton("  🔍   Results")
@@ -139,10 +201,8 @@ class FivoraMainApp(QMainWindow):
         self.btn_operators = QPushButton("  👥   Operators")
 
         self.sidebar_buttons = [
-            (self.btn_dashboard, 2),
-            (self.btn_upload, 3),
-            (self.btn_results, 4),
-            (self.btn_report, 5)
+            (self.btn_dashboard, 2), (self.btn_upload, 3),
+            (self.btn_results, 4), (self.btn_report, 5)
         ]
 
         for btn, idx in self.sidebar_buttons:
@@ -158,7 +218,6 @@ class FivoraMainApp(QMainWindow):
 
         sidebar_layout.addStretch()
 
-        # Sidebar Bottom Tools (Theme Toggle + Logout)
         self.btn_sidebar_theme = QPushButton("  ☀   Toggle Theme")
         self.btn_sidebar_theme.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_sidebar_theme.setFixedHeight(40)
@@ -173,7 +232,6 @@ class FivoraMainApp(QMainWindow):
         sidebar_layout.addSpacing(4)
         sidebar_layout.addWidget(self.btn_logout)
 
-        # Protected content wrapper keeps identity visible on every work page.
         protected_content = QWidget()
         protected_content_layout = QVBoxLayout(protected_content)
         protected_content_layout.setContentsMargins(0, 0, 0, 0)
@@ -191,7 +249,6 @@ class FivoraMainApp(QMainWindow):
         app_header_layout.addSpacing(18)
         app_header_layout.addWidget(self.header_role)
 
-        # Protected Content Pages Stack
         self.protected_stack = QStackedWidget()
         self.dashboard_page = DashboardPage(self)
         self.upload_page = UploadPage(self)
@@ -199,31 +256,25 @@ class FivoraMainApp(QMainWindow):
         self.history_page = HistoryPage(self)
         self.operators_page = OperatorsPage(self)
 
-        self.protected_stack.addWidget(self.dashboard_page)  # Protected Stack Index 0 (Global 2)
-        self.protected_stack.addWidget(self.upload_page)     # Protected Stack Index 1 (Global 3)
-        self.protected_stack.addWidget(self.results_page)    # Protected Stack Index 2 (Global 4)
-        self.protected_stack.addWidget(self.history_page)    # Protected Stack Index 3 (Global 5)
-        self.protected_stack.addWidget(self.operators_page)  # Protected Stack Index 4 (Global 6)
+        self.protected_stack.addWidget(self.dashboard_page)  
+        self.protected_stack.addWidget(self.upload_page)     
+        self.protected_stack.addWidget(self.results_page)    
+        self.protected_stack.addWidget(self.history_page)    
+        self.protected_stack.addWidget(self.operators_page)  
 
         app_layout.addWidget(self.sidebar_widget)
         protected_content_layout.addWidget(self.app_header)
         protected_content_layout.addWidget(self.protected_stack)
         app_layout.addWidget(protected_content)
 
-        # Add both root views to root_stack
-        self.root_stack.addWidget(self.auth_view) # Index 0
-        self.root_stack.addWidget(self.app_view)  # Index 1
+        self.root_stack.addWidget(self.auth_view) 
+        self.root_stack.addWidget(self.app_view)  
 
         self.setCentralWidget(self.root_stack)
-
-        # Backward compatibility wrapper for self.pages.widget(idx) calls in child pages
         self.pages = PagesCompatWrapper(self)
 
-        # Apply global theme and set default unauthenticated state
         self.apply_global_theme()
         self.set_login_state(False)
-        
-        # 🔴 ඇප් එක ඕපන් වෙද්දීම Full Screen (Maximized) වෙන්න මේ පේළිය එකතු කළා
         self.showMaximized()
 
     def toggle_theme(self):
@@ -272,12 +323,11 @@ class FivoraMainApp(QMainWindow):
         current_idx = self.get_current_global_index()
         self.update_nav_styles(current_idx)
 
-        # Notify sub-pages of theme change
         pages_to_theme = [
-            self.login_page, self.signup_page, 
+            self.welcome_page, self.login_page, self.signup_page, 
             self.dashboard_page, self.upload_page, 
-            self.results_page, self.history_page
-            , self.operators_page
+            self.results_page, self.history_page, 
+            self.operators_page
         ]
         for page in pages_to_theme:
             if hasattr(page, 'apply_theme'):
@@ -285,27 +335,31 @@ class FivoraMainApp(QMainWindow):
 
     def get_current_global_index(self):
         if self.root_stack.currentIndex() == 0:
-            return self.auth_stack.currentIndex()
+            auth_idx = self.auth_stack.currentIndex()
+            return -1 if auth_idx == 0 else auth_idx - 1
         else:
             return self.protected_stack.currentIndex() + 2
 
     def switch_page(self, index: int):
-        # Access control for protected routes
         if index in [2, 3, 4, 5, 6] and not self.is_logged_in:
             from custom_dialog import show_message_dialog
             show_message_dialog(self, "Sign In Required", "Please sign in to open this workspace.", "warning", "OK", self.is_dark_mode)
             self.switch_page(0)
             return
 
-        if index in [0, 1]: # Public Auth Pages
+        if index == -1: 
             self.root_stack.setCurrentIndex(0)
-            self.auth_stack.setCurrentIndex(index)
+            self.auth_stack.setCurrentIndex(0)
+
+        elif index in [0, 1]: 
+            self.root_stack.setCurrentIndex(0)
+            self.auth_stack.setCurrentIndex(index + 1)
             if index == 0 and hasattr(self.login_page, 'clear_fields'):
                 self.login_page.clear_fields()
             elif index == 1 and hasattr(self.signup_page, 'clear_fields'):
                 self.signup_page.clear_fields()
 
-        elif index in [2, 3, 4, 5, 6]: # Protected Dashboard Pages
+        elif index in [2, 3, 4, 5, 6]: 
             if index == 6 and self.current_role != "Admin":
                 from custom_dialog import show_message_dialog
                 show_message_dialog(self, "Admin Access Required", "Only Admins can open the Operators page.", "error", "OK", self.is_dark_mode)
@@ -324,7 +378,6 @@ class FivoraMainApp(QMainWindow):
         self.update_nav_styles(index)
 
     def update_nav_styles(self, active_index: int):
-        # Auth Top Header buttons styling
         auth_active = "background-color: #0ea5e9; color: white; font-weight: bold; border-radius: 6px; padding: 8px 20px; border: none; font-size: 13px;"
         if self.is_dark_mode:
             auth_normal = "background-color: transparent; border: none; padding: 8px 20px; font-weight: bold; color: #94a3b8; font-size: 13px;"
@@ -334,8 +387,8 @@ class FivoraMainApp(QMainWindow):
         self.btn_signin.setStyleSheet(auth_active if active_index == 0 else auth_normal)
         self.btn_signup.setStyleSheet(auth_active if active_index == 1 else auth_normal)
 
-        # Vertical Sidebar buttons styling
-        sidebar_active = "QPushButton { background-color: #00A3FF; color: white; font-weight: bold; border-radius: 8px; text-align: left; padding-left: 16px; border: none; font-size: 13px; }"
+        sidebar_active = "QPushButton { background-color: #1e40af; color: white; font-weight: bold; border-radius: 6px; text-align: left; padding-left: 16px; border: none; font-size: 13px; }"
+        
         if self.is_dark_mode:
             sidebar_normal = "QPushButton { background-color: transparent; color: #94a3b8; border-radius: 8px; text-align: left; padding-left: 16px; border: none; font-size: 13px; font-weight: 600; } QPushButton:hover { background-color: #1e293b; color: white; }"
         else:
@@ -362,7 +415,7 @@ class FivoraMainApp(QMainWindow):
             self.btn_report.setText("  📋   Admin Reports" if self.current_role == "Admin" else "  📋   Reports")
             self.btn_operators.setVisible(self.current_role == "Admin")
             self.root_stack.setCurrentIndex(1)
-            self.switch_page(2) # Default to Dashboard post-authentication
+            self.switch_page(2) 
         else:
             self.current_user = None
             self.current_role = "Operator"
@@ -371,8 +424,7 @@ class FivoraMainApp(QMainWindow):
             self.btn_report.setText("  📋   Reports")
             self.btn_operators.setVisible(False)
             self.root_stack.setCurrentIndex(0)
-            self.switch_page(0) # Default to Sign In in unauthenticated state
-
+            self.switch_page(-1) 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

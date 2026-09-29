@@ -2,6 +2,7 @@ import bcrypt
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, 
                              QPushButton, QFrame)
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap, QPainter, QColor
 from database import get_user_by_email, ADMIN_EMAIL, ADMIN_PASSWORD, start_activity_log
 from custom_dialog import show_message_dialog
 
@@ -11,6 +12,9 @@ class LoginPage(QWidget):
         self.parent = parent
         self.is_dark_mode = True
         
+        # Background පින්තූරය Load කිරීම
+        self.bg_pixmap = QPixmap("welcome_fabric.jfif")
+        
         main_layout = QVBoxLayout(self)
         main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.setContentsMargins(20, 20, 20, 20)
@@ -19,7 +23,6 @@ class LoginPage(QWidget):
         self.brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.sub_brand = QLabel("INDUSTRIAL FABRIC INSPECTION SYSTEM")
-        self.sub_brand.setStyleSheet("font-size: 10px; font-weight: bold; color: #0ea5e9; letter-spacing: 1px;")
         self.sub_brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.page_title = QLabel("Sign In")
@@ -36,12 +39,12 @@ class LoginPage(QWidget):
         card_layout.setSpacing(15)
 
         self.lbl_email = QLabel("EMAIL ADDRESS")
-        self.lbl_email.setStyleSheet("font-size: 10px; font-weight: bold; color: #64748b; border: none;")
+        self.lbl_email.setStyleSheet("font-size: 10px; font-weight: bold; color: #94a3b8; border: none; background: transparent;")
         self.email = QLineEdit()
         self.email.setPlaceholderText("inspector@fivora.com")
 
         self.lbl_pwd = QLabel("PASSWORD")
-        self.lbl_pwd.setStyleSheet("font-size: 10px; font-weight: bold; color: #64748b; border: none; margin-top: 5px;")
+        self.lbl_pwd.setStyleSheet("font-size: 10px; font-weight: bold; color: #94a3b8; border: none; margin-top: 5px; background: transparent;")
         self.password = QLineEdit()
         self.password.setPlaceholderText("••••••••")
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
@@ -59,26 +62,50 @@ class LoginPage(QWidget):
         
         self.apply_theme(True)
 
+    # Background එකට පින්තූරය ඇඳීම
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        if not self.bg_pixmap.isNull():
+            scaled_bg = self.bg_pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+            x = (self.width() - scaled_bg.width()) // 2
+            y = (self.height() - scaled_bg.height()) // 2
+            painter.drawPixmap(x, y, scaled_bg)
+            
+            # පින්තූරය උඩින් අඳුරු Transparent තට්ටුවක් දැමීම (Opacity: 210)
+            overlay_color = QColor(11, 15, 25, 210) 
+            painter.fillRect(self.rect(), overlay_color)
+        else:
+            painter.fillRect(self.rect(), QColor("#0b0f19"))
+
     def apply_theme(self, is_dark):
         self.is_dark_mode = is_dark
+        self.setStyleSheet("") # Solid background එක අයින් කළා paintEvent එක පේන්න
+        
         if is_dark:
-            self.setStyleSheet("background-color: #0b0f19;")
-            self.brand.setStyleSheet("font-size: 32px; font-weight: bold; color: white;")
-            self.page_title.setStyleSheet("font-size: 22px; font-weight: bold; color: white; margin-top: 15px; margin-bottom: 20px;")
-            self.card.setStyleSheet("QFrame { background-color: #111827; border-radius: 12px; border: 1px solid #1e293b; }")
-            input_style = "QLineEdit { padding: 12px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white; font-size: 13px; } QLineEdit:focus { border: 1px solid #0ea5e9; }"
+            self.brand.setStyleSheet("font-size: 34px; font-weight: 900; color: white; background: transparent;")
+            self.sub_brand.setStyleSheet("font-size: 11px; font-weight: bold; color: #38bdf8; letter-spacing: 1.5px; background: transparent;")
+            self.page_title.setStyleSheet("font-size: 24px; font-weight: bold; color: white; margin-top: 20px; margin-bottom: 20px; background: transparent;")
+            
+            # Card එක ටිකක් Transparent කළා
+            self.card.setStyleSheet("QFrame { background-color: rgba(17, 24, 39, 0.85); border-radius: 12px; border: 1px solid #1e293b; }")
+            
+            input_style = "QLineEdit { padding: 12px; min-height: 45px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white; font-size: 14px; } QLineEdit:focus { border: 1px solid #0ea5e9; }"
             self.email.setStyleSheet(input_style)
             self.password.setStyleSheet(input_style)
-            self.btn_signin.setStyleSheet("QPushButton { background-color: #0ea5e9; color: white; padding: 14px; font-weight: bold; border-radius: 6px; font-size: 14px; border: none; margin-top: 10px; } QPushButton:hover { background-color: #0284c7; }")
+            
+            self.btn_signin.setStyleSheet("QPushButton { background-color: #0ea5e9; color: white; padding: 14px; min-height: 50px; font-weight: bold; border-radius: 6px; font-size: 15px; border: none; margin-top: 15px; } QPushButton:hover { background-color: #0284c7; }")
         else:
-            self.setStyleSheet("background-color: #f4f6f9;")
-            self.brand.setStyleSheet("font-size: 32px; font-weight: bold; color: #0f172a;")
-            self.page_title.setStyleSheet("font-size: 22px; font-weight: bold; color: #0f172a; margin-top: 15px; margin-bottom: 20px;")
-            self.card.setStyleSheet("QFrame { background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; }")
-            input_style = "QLineEdit { padding: 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 13px; } QLineEdit:focus { border: 1px solid #0ea5e9; }"
+            self.brand.setStyleSheet("font-size: 34px; font-weight: 900; color: #0f172a; background: transparent;")
+            self.sub_brand.setStyleSheet("font-size: 11px; font-weight: bold; color: #0284c7; letter-spacing: 1.5px; background: transparent;")
+            self.page_title.setStyleSheet("font-size: 24px; font-weight: bold; color: #0f172a; margin-top: 20px; margin-bottom: 20px; background: transparent;")
+            
+            self.card.setStyleSheet("QFrame { background-color: rgba(255, 255, 255, 0.95); border-radius: 12px; border: 1px solid #e2e8f0; }")
+            
+            input_style = "QLineEdit { padding: 12px; min-height: 45px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 14px; } QLineEdit:focus { border: 1px solid #0ea5e9; }"
             self.email.setStyleSheet(input_style)
             self.password.setStyleSheet(input_style)
-            self.btn_signin.setStyleSheet("QPushButton { background-color: #0ea5e9; color: white; padding: 14px; font-weight: bold; border-radius: 6px; font-size: 14px; border: none; margin-top: 10px; } QPushButton:hover { background-color: #0284c7; }")
+            
+            self.btn_signin.setStyleSheet("QPushButton { background-color: #0ea5e9; color: white; padding: 14px; min-height: 50px; font-weight: bold; border-radius: 6px; font-size: 15px; border: none; margin-top: 15px; } QPushButton:hover { background-color: #0284c7; }")
 
     def clear_fields(self):
         self.email.clear()
@@ -117,6 +144,7 @@ class LoginPage(QWidget):
             if status in {"deactivated", "rejected"}:
                 show_message_dialog(self.window(), "Account Deactivated", "Your account has been deactivated by the Admin.", "error", "OK", is_dark)
                 return
+            
             stored_hash = user_record.get("password_hash", "")
             if isinstance(stored_hash, bytes):
                 stored_hash_str = stored_hash.decode('utf-8', errors='ignore')

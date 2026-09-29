@@ -154,7 +154,13 @@ class HistoryPage(QWidget):
             d_status = str(row_data[8]) if len(row_data) > 8 and row_data[8] else ("DEFECT DETECTED" if "Reject" in action else "PASS")
             d_type = str(row_data[9]) if len(row_data) > 9 and row_data[9] else "None"
             d_count = int(row_data[10]) if len(row_data) > 10 and str(row_data[10]).isdigit() else (1 if d_status == "DEFECT DETECTED" else 0)
-            operator_name = str(row_data[14]) if len(row_data) > 14 and row_data[14] else "QC_INSPECTOR_01"
+            
+            operator_name = "QC_INSPECTOR_01"
+            if len(row_data) > 11 and row_data[11]:
+                operator_name = str(row_data[11])
+            elif self.parent and hasattr(self.parent, 'current_user') and self.parent.current_user:
+                u = self.parent.current_user
+                operator_name = " ".join(filter(None, [u.get("fname"), u.get("lname")])).strip() or u.get("email", "QC_INSPECTOR_01")
 
             if "Accept" in action or d_status == "PASS":
                 accepted_count += 1
