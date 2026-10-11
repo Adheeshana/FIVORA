@@ -1,7 +1,5 @@
 venv/
+dist/
+build/
+*.exe
 __pycache__/
-*.db
-*.log
-.vscode/
-captured_batches/
-temp_*.jpg

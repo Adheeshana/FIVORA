@@ -16,8 +16,20 @@ class SignupPage(QWidget):
         self.bg_pixmap = QPixmap("welcome_fabric.jfif")
         
         main_layout = QVBoxLayout(self)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.setContentsMargins(20, 20, 20, 20)
+
+        top_bar = QHBoxLayout()
+        self.btn_back = QPushButton("← Back to Welcome")
+        self.btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_back.clicked.connect(lambda: self.parent.switch_page(-1) if self.parent else None)
+        top_bar.addWidget(self.btn_back, alignment=Qt.AlignmentFlag.AlignLeft)
+        top_bar.addStretch()
+        main_layout.addLayout(top_bar)
+
+        center_container = QWidget()
+        center_layout = QVBoxLayout(center_container)
+        center_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        center_layout.setContentsMargins(0, 0, 0, 0)
 
         self.brand = QLabel("Fivora")
         self.brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -28,15 +40,15 @@ class SignupPage(QWidget):
         self.page_title = QLabel("Create Account")
         self.page_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        main_layout.addWidget(self.brand)
-        main_layout.addWidget(self.sub_brand)
-        main_layout.addWidget(self.page_title)
+        center_layout.addWidget(self.brand)
+        center_layout.addWidget(self.sub_brand)
+        center_layout.addWidget(self.page_title)
 
         self.card = QFrame()
         self.card.setFixedWidth(460)
         card_layout = QVBoxLayout(self.card)
         card_layout.setContentsMargins(30, 25, 30, 25)
-        card_layout.setSpacing(8) # Space එක ප්‍රමාණයට අඩු කළා
+        card_layout.setSpacing(8)
 
         def create_label(text):
             lbl = QLabel(text)
@@ -81,7 +93,9 @@ class SignupPage(QWidget):
         card_layout.addSpacing(6)
         card_layout.addWidget(self.btn_signup)
         
-        main_layout.addWidget(self.card)
+        center_layout.addWidget(self.card)
+        main_layout.addWidget(center_container, 1)
+        
         self.apply_theme(True)
 
     def paintEvent(self, event):
@@ -102,36 +116,31 @@ class SignupPage(QWidget):
         self.setStyleSheet("") 
         
         if is_dark:
+            self.btn_back.setStyleSheet("QPushButton { color: #cbd5e1; font-weight: bold; font-size: 14px; background: transparent; border: none; } QPushButton:hover { color: white; }")
             self.brand.setStyleSheet("font-size: 32px; font-weight: 900; color: white; background: transparent;")
             self.sub_brand.setStyleSheet("font-size: 11px; font-weight: bold; color: #38bdf8; letter-spacing: 1.5px; background: transparent;")
             self.page_title.setStyleSheet("font-size: 22px; font-weight: bold; color: white; margin-top: 10px; margin-bottom: 15px; background: transparent;")
-            
             self.card.setStyleSheet("QFrame { background-color: rgba(17, 24, 39, 0.88); border-radius: 12px; border: 1px solid #1e293b; }")
-            
-            # Text box උස ප්‍රමාණයකට (36px) සකස් කළා
             input_style = "QLineEdit { padding: 8px 12px; min-height: 36px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white; font-size: 13px; } QLineEdit:focus { border: 1px solid #0ea5e9; }"
             self.fname.setStyleSheet(input_style)
             self.lname.setStyleSheet(input_style)
             self.email.setStyleSheet(input_style)
             self.password.setStyleSheet(input_style)
             self.confirm_password.setStyleSheet(input_style)
-            
             self.terms_checkbox.setStyleSheet("color: #cbd5e1; font-size: 12px; border: none; background: transparent;")
             self.btn_signup.setStyleSheet("QPushButton { background-color: #0ea5e9; color: white; padding: 10px; min-height: 42px; font-weight: bold; border-radius: 6px; font-size: 14px; border: none; } QPushButton:hover { background-color: #0284c7; }")
         else:
+            self.btn_back.setStyleSheet("QPushButton { color: #475569; font-weight: bold; font-size: 14px; background: transparent; border: none; } QPushButton:hover { color: #0f172a; }")
             self.brand.setStyleSheet("font-size: 32px; font-weight: 900; color: #0f172a; background: transparent;")
             self.sub_brand.setStyleSheet("font-size: 11px; font-weight: bold; color: #0284c7; letter-spacing: 1.5px; background: transparent;")
             self.page_title.setStyleSheet("font-size: 22px; font-weight: bold; color: #0f172a; margin-top: 10px; margin-bottom: 15px; background: transparent;")
-            
             self.card.setStyleSheet("QFrame { background-color: rgba(255, 255, 255, 0.95); border-radius: 12px; border: 1px solid #e2e8f0; }")
-            
             input_style = "QLineEdit { padding: 8px 12px; min-height: 36px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 13px; } QLineEdit:focus { border: 1px solid #0ea5e9; }"
             self.fname.setStyleSheet(input_style)
             self.lname.setStyleSheet(input_style)
             self.email.setStyleSheet(input_style)
             self.password.setStyleSheet(input_style)
             self.confirm_password.setStyleSheet(input_style)
-            
             self.terms_checkbox.setStyleSheet("color: #475569; font-size: 12px; border: none; background: transparent;")
             self.btn_signup.setStyleSheet("QPushButton { background-color: #0ea5e9; color: white; padding: 10px; min-height: 42px; font-weight: bold; border-radius: 6px; font-size: 14px; border: none; } QPushButton:hover { background-color: #0284c7; }")
 

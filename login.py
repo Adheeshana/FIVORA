@@ -1,5 +1,5 @@
 import bcrypt
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, 
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
                              QPushButton, QFrame)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QPainter, QColor
@@ -12,12 +12,24 @@ class LoginPage(QWidget):
         self.parent = parent
         self.is_dark_mode = True
         
-        # Background පින්තූරය Load කිරීම
         self.bg_pixmap = QPixmap("welcome_fabric.jfif")
         
         main_layout = QVBoxLayout(self)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.setContentsMargins(20, 20, 20, 20)
+
+        top_bar = QHBoxLayout()
+        self.btn_back = QPushButton("← Back to Welcome")
+        self.btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_back.clicked.connect(lambda: self.parent.switch_page(-1) if self.parent else None)
+        top_bar.addWidget(self.btn_back, alignment=Qt.AlignmentFlag.AlignLeft)
+        top_bar.addStretch()
+        main_layout.addLayout(top_bar)
+
+        # 2. මැද කොටස (Login Card)
+        center_container = QWidget()
+        center_layout = QVBoxLayout(center_container)
+        center_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        center_layout.setContentsMargins(0, 0, 0, 0)
 
         self.brand = QLabel("Fivora")
         self.brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -28,9 +40,9 @@ class LoginPage(QWidget):
         self.page_title = QLabel("Sign In")
         self.page_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        main_layout.addWidget(self.brand)
-        main_layout.addWidget(self.sub_brand)
-        main_layout.addWidget(self.page_title)
+        center_layout.addWidget(self.brand)
+        center_layout.addWidget(self.sub_brand)
+        center_layout.addWidget(self.page_title)
 
         self.card = QFrame()
         self.card.setFixedWidth(420)
@@ -58,11 +70,12 @@ class LoginPage(QWidget):
         card_layout.addWidget(self.lbl_pwd)
         card_layout.addWidget(self.password)
         card_layout.addWidget(self.btn_signin)
-        main_layout.addWidget(self.card)
+        
+        center_layout.addWidget(self.card)
+        main_layout.addWidget(center_container, 1) # 1 stretchs to fill space safely
         
         self.apply_theme(True)
 
-    # Background එකට පින්තූරය ඇඳීම
     def paintEvent(self, event):
         painter = QPainter(self)
         if not self.bg_pixmap.isNull():
@@ -71,7 +84,6 @@ class LoginPage(QWidget):
             y = (self.height() - scaled_bg.height()) // 2
             painter.drawPixmap(x, y, scaled_bg)
             
-            # පින්තූරය උඩින් අඳුරු Transparent තට්ටුවක් දැමීම (Opacity: 210)
             overlay_color = QColor(11, 15, 25, 210) 
             painter.fillRect(self.rect(), overlay_color)
         else:
@@ -79,32 +91,27 @@ class LoginPage(QWidget):
 
     def apply_theme(self, is_dark):
         self.is_dark_mode = is_dark
-        self.setStyleSheet("") # Solid background එක අයින් කළා paintEvent එක පේන්න
+        self.setStyleSheet("") 
         
         if is_dark:
+            self.btn_back.setStyleSheet("QPushButton { color: #cbd5e1; font-weight: bold; font-size: 14px; background: transparent; border: none; } QPushButton:hover { color: white; }")
             self.brand.setStyleSheet("font-size: 34px; font-weight: 900; color: white; background: transparent;")
             self.sub_brand.setStyleSheet("font-size: 11px; font-weight: bold; color: #38bdf8; letter-spacing: 1.5px; background: transparent;")
             self.page_title.setStyleSheet("font-size: 24px; font-weight: bold; color: white; margin-top: 20px; margin-bottom: 20px; background: transparent;")
-            
-            # Card එක ටිකක් Transparent කළා
             self.card.setStyleSheet("QFrame { background-color: rgba(17, 24, 39, 0.85); border-radius: 12px; border: 1px solid #1e293b; }")
-            
             input_style = "QLineEdit { padding: 12px; min-height: 45px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; color: white; font-size: 14px; } QLineEdit:focus { border: 1px solid #0ea5e9; }"
             self.email.setStyleSheet(input_style)
             self.password.setStyleSheet(input_style)
-            
             self.btn_signin.setStyleSheet("QPushButton { background-color: #0ea5e9; color: white; padding: 14px; min-height: 50px; font-weight: bold; border-radius: 6px; font-size: 15px; border: none; margin-top: 15px; } QPushButton:hover { background-color: #0284c7; }")
         else:
+            self.btn_back.setStyleSheet("QPushButton { color: #475569; font-weight: bold; font-size: 14px; background: transparent; border: none; } QPushButton:hover { color: #0f172a; }")
             self.brand.setStyleSheet("font-size: 34px; font-weight: 900; color: #0f172a; background: transparent;")
             self.sub_brand.setStyleSheet("font-size: 11px; font-weight: bold; color: #0284c7; letter-spacing: 1.5px; background: transparent;")
             self.page_title.setStyleSheet("font-size: 24px; font-weight: bold; color: #0f172a; margin-top: 20px; margin-bottom: 20px; background: transparent;")
-            
             self.card.setStyleSheet("QFrame { background-color: rgba(255, 255, 255, 0.95); border-radius: 12px; border: 1px solid #e2e8f0; }")
-            
             input_style = "QLineEdit { padding: 12px; min-height: 45px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 14px; } QLineEdit:focus { border: 1px solid #0ea5e9; }"
             self.email.setStyleSheet(input_style)
             self.password.setStyleSheet(input_style)
-            
             self.btn_signin.setStyleSheet("QPushButton { background-color: #0ea5e9; color: white; padding: 14px; min-height: 50px; font-weight: bold; border-radius: 6px; font-size: 15px; border: none; margin-top: 15px; } QPushButton:hover { background-color: #0284c7; }")
 
     def clear_fields(self):

@@ -2,7 +2,7 @@ import os
 import re
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QFrame, QGraphicsDropShadowEffect)
-from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtCore import Qt, QPoint, QTimer  
 from PyQt6.QtGui import QColor
 
 
@@ -277,6 +277,9 @@ def show_success_dialog(parent, title="Account Created Successfully!",
     """Convenience helper to show a modern success popup."""
     dlg = ModernDialog(parent=parent, title=title, message=message, 
                        dialog_type="success", button_text=button_text, is_dark=is_dark)
+    
+    QTimer.singleShot(500, dlg.accept)
+    
     return dlg.exec()
 
 def show_message_dialog(parent, title="", message="", dialog_type="info", 
@@ -284,4 +287,9 @@ def show_message_dialog(parent, title="", message="", dialog_type="info",
     """Convenience helper to show a modern styled popup."""
     dlg = ModernDialog(parent=parent, title=title, message=message, 
                        dialog_type=dialog_type, button_text=button_text, is_dark=is_dark)
+    
+    if dialog_type in ["success", "info"]:
+        QTimer.singleShot(500, dlg.accept) 
+    elif dialog_type == "warning":
+        QTimer.singleShot(1500, dlg.accept) 
     return dlg.exec()

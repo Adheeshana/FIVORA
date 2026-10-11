@@ -9,7 +9,7 @@ APP_TITLE = "FIVORA — Industrial Fabric Inspection System"
 APP_SUBTITLE = "Workstation Quality Control & Traceability Engine"
 
 # --- Camera & Image Acquisition Configuration ---
-DEFAULT_CAMERA_URL = "http://172.31.98.149:8080/video"
+DEFAULT_CAMERA_URL = "http://10.210.10.242:8080/video"
 DEFAULT_CAMERA_NAME = "QC Conveyor Camera 1"
 DEFAULT_HTTP_PORT = 8080
 DEFAULT_RTSP_PORT = 8080

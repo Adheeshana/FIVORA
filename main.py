@@ -7,14 +7,13 @@ import sys
 import json
 import sqlite3
 from pathlib import Path
-from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QMessageBox
-from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
-from PyQt5.QtGui import QIcon, QFont
+from PyQt6.QtWidgets import QApplication, QMainWindow, QStackedWidget, QMessageBox
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
+from PyQt6.QtGui import QIcon, QFont
 
 from screens.login_screen import LoginScreen
 from screens.signup_screen import SignupScreen
 from screens.dashboard_screen import DashboardScreen
-from database.db_manager import DatabaseManager
 from utils.styles import apply_stylesheet
 
 
@@ -25,7 +24,6 @@ class FivoraApplication(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
         
         # Initialize database
-        self.db_manager = DatabaseManager()
         self.db_manager.init_database()
         
         # Apply global stylesheet

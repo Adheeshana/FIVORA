@@ -19,7 +19,6 @@ def validate_image_file(file_path):
     if file_size_mb > MAX_FILE_SIZE_MB:
         return False, "File size exceeds limit."
     
-    # කැමරාවෙන් එන සියලුම ෆ්‍රේම්ස් (Frames) අනුමත වීම සඳහා Blur සහ Resolution Checks මෙතනින් ඉවත් කර ඇත.
     
     print(f"[PASSED] {file_path}: Valid Fabric Image.")
     return True, "Image validation passed."

@@ -17,7 +17,6 @@ class OperatorsPage(QWidget):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
 
-        # Scroll area එකක් දැම්මා සම්පූර්ණ පිටුවම ලස්සනට Scroll වෙන්න
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
@@ -101,7 +100,6 @@ class OperatorsPage(QWidget):
             self.table_operators.setItem(row_idx, 1, item_email)
             self.table_operators.setItem(row_idx, 2, item_status)
 
-            # Action Button එක Status එක අනුව වෙනස් කිරීම
             btn_action = QPushButton()
             btn_action.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_action.setFixedHeight(30)

@@ -9,8 +9,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QStackedWidget, QLabel, QFrame)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QPainter, QColor # Background එක අඳින්න අලුත් දේවල්
-
+from PyQt6.QtGui import QPixmap, QPainter, QColor 
 from login import LoginPage
 from signup import SignupPage
 from dashboard import DashboardPage
@@ -21,21 +20,17 @@ from operators_page import OperatorsPage
 from database import initialize_database, finish_activity_log
 
 # ==========================================
-# අලුතින් එකතු කළ FULL-SCREEN WELCOME පිටුව
-# ==========================================
 class WelcomePage(QWidget):
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
         
-        # Background පින්තූරය Load කරගැනීම
         self.bg_pixmap = QPixmap("welcome_fabric.jfif")
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(15)
 
-        # --- Text Section (ප්‍රමාණය ටිකක් ලොකු කළා Full Screen එකට ගැලපෙන්න) ---
         self.title = QLabel("Welcome to FIVORA")
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
@@ -51,7 +46,6 @@ class WelcomePage(QWidget):
         self.btn_start.setFixedSize(240, 55)
         self.btn_start.clicked.connect(lambda: self.parent.switch_page(0) if self.parent else None) 
 
-        # හිස් ඉඩක් (Margin) දීලා මැදට ගත්තා
         layout.addStretch()
         layout.addWidget(self.title)
         layout.addWidget(self.subtitle)
@@ -61,27 +55,21 @@ class WelcomePage(QWidget):
         layout.addWidget(self.btn_start, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addStretch()
 
-    # මේ කොටසින් තමයි පින්තූරය මුළු තිරයටම අඳින්නේ
     def paintEvent(self, event):
         painter = QPainter(self)
         if not self.bg_pixmap.isNull():
-            # පින්තූරය Screen එකට ගැලපෙන්න Scale කිරීම (Aspect Ratio එක ආරක්ෂා කරමින්)
             scaled_bg = self.bg_pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
             
-            # පින්තූරය හරියටම මැදට ගන්න
             x = (self.width() - scaled_bg.width()) // 2
             y = (self.height() - scaled_bg.height()) // 2
             painter.drawPixmap(x, y, scaled_bg)
             
-            # අකුරු පැහැදිලිව පේන්න පින්තූරය උඩින් අඳුරු Transparent තට්ටුවක් (Overlay) දැමීම
-            overlay_color = QColor(11, 15, 25, 190) # 190 කියන්නේ අඳුරු ප්‍රමාණය (0-255)
+            overlay_color = QColor(11, 15, 25, 190)
             painter.fillRect(self.rect(), overlay_color)
         else:
-            # පින්තූරය හොයාගන්න බැරි වුණොත් සාමාන්‍ය පාට වැටෙනවා
             painter.fillRect(self.rect(), QColor("#0b0f19"))
 
     def apply_theme(self, is_dark):
-        # Background එකේ පින්තූරයක් තියෙන නිසා අකුරු වල Background එක Transparent කළා
         self.title.setStyleSheet("font-size: 52px; font-weight: 900; color: #ffffff; letter-spacing: 2px; background: transparent;")
         self.subtitle.setStyleSheet("font-size: 20px; font-weight: bold; color: #38bdf8; background: transparent;")
         self.desc.setStyleSheet("font-size: 15px; color: #cbd5e1; background: transparent;")
@@ -416,6 +404,9 @@ class FivoraMainApp(QMainWindow):
             self.btn_operators.setVisible(self.current_role == "Admin")
             self.root_stack.setCurrentIndex(1)
             self.switch_page(2) 
+            
+            if hasattr(self.dashboard_page, 'start_ai_models'):
+                self.dashboard_page.start_ai_models()
         else:
             self.current_user = None
             self.current_role = "Operator"
@@ -424,7 +415,7 @@ class FivoraMainApp(QMainWindow):
             self.btn_report.setText("  📋   Reports")
             self.btn_operators.setVisible(False)
             self.root_stack.setCurrentIndex(0)
-            self.switch_page(-1) 
+            self.switch_page(-1)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
